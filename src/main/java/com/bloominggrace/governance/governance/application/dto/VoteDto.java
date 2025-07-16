@@ -1,7 +1,9 @@
 package com.bloominggrace.governance.governance.application.dto;
 
 import com.bloominggrace.governance.governance.domain.model.Vote;
+import com.bloominggrace.governance.governance.domain.model.VoteId;
 import com.bloominggrace.governance.governance.domain.model.VoteType;
+import com.bloominggrace.governance.shared.domain.UserId;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -14,15 +16,11 @@ public class VoteDto {
     private final long votingPower;
     private final String reason;
     private final LocalDateTime createdAt;
+    private final String transactionSignature;
+    private final String voterWalletAddress;
 
-    public VoteDto(
-            UUID id,
-            UUID proposalId,
-            UUID voterId,
-            String voteType,
-            long votingPower,
-            String reason,
-            LocalDateTime createdAt) {
+    public VoteDto(UUID id, UUID proposalId, UUID voterId, String voteType, long votingPower,
+                   String reason, LocalDateTime createdAt, String transactionSignature, String voterWalletAddress) {
         this.id = id;
         this.proposalId = proposalId;
         this.voterId = voterId;
@@ -30,6 +28,8 @@ public class VoteDto {
         this.votingPower = votingPower;
         this.reason = reason;
         this.createdAt = createdAt;
+        this.transactionSignature = transactionSignature;
+        this.voterWalletAddress = voterWalletAddress;
     }
 
     public static VoteDto from(Vote vote) {
@@ -40,35 +40,34 @@ public class VoteDto {
             vote.getVoteType().name(),
             vote.getVotingPower(),
             vote.getReason(),
-            vote.getCreatedAt()
+            vote.getCreatedAt(),
+            null, // transactionSignature는 별도로 설정
+            null  // voterWalletAddress는 별도로 설정
         );
     }
 
-    public UUID getId() {
-        return id;
+    public static VoteDto from(Vote vote, String transactionSignature, String voterWalletAddress) {
+        return new VoteDto(
+            vote.getId().getValue(),
+            vote.getProposalId().getValue(),
+            vote.getVoterId().getValue(),
+            vote.getVoteType().name(),
+            vote.getVotingPower(),
+            vote.getReason(),
+            vote.getCreatedAt(),
+            transactionSignature,
+            voterWalletAddress
+        );
     }
 
-    public UUID getProposalId() {
-        return proposalId;
-    }
-
-    public UUID getVoterId() {
-        return voterId;
-    }
-
-    public String getVoteType() {
-        return voteType;
-    }
-
-    public long getVotingPower() {
-        return votingPower;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    // Getters
+    public UUID getId() { return id; }
+    public UUID getProposalId() { return proposalId; }
+    public UUID getVoterId() { return voterId; }
+    public String getVoteType() { return voteType; }
+    public long getVotingPower() { return votingPower; }
+    public String getReason() { return reason; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public String getTransactionSignature() { return transactionSignature; }
+    public String getVoterWalletAddress() { return voterWalletAddress; }
 } 

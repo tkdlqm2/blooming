@@ -8,8 +8,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -25,45 +24,30 @@ public class PointAccount extends AggregateRoot {
     @Column(name = "user_id", nullable = false, unique = true)
     private UUID userId;
 
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "amount", column = @Column(name = "balance", nullable = false))
-    })
-    private PointAmount balance;
+    @Column(name = "balance", nullable = false)
+    private BigDecimal balance;
 
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "amount", column = @Column(name = "frozen_balance", nullable = false))
-    })
-    private PointAmount frozenBalance;
+    @Column(name = "frozen_balance", nullable = false)
+    private BigDecimal frozenBalance;
 
     @Version
     private Long version;
 
-    @OneToMany(mappedBy = "pointAccount", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PointTransaction> transactions = new ArrayList<>();
-
     public PointAccount(UUID userId) {
         this.userId = userId;
-        this.balance = PointAmount.zero();
-        this.frozenBalance = PointAmount.zero();
+        this.balance = BigDecimal.ZERO;
+        this.frozenBalance = BigDecimal.ZERO;
     }
 
     public void earnPoints(PointAmount amount, String reason) {
-        this.balance = this.balance.add(amount);
-        PointTransaction transaction = new PointTransaction(userId, PointTransactionType.EARN, amount, reason);
-        transaction.setPointAccount(this);
-        this.transactions.add(transaction);
+        this.balance = this.balance.add(amount.getAmount());
         addDomainEvent(new PointsEarnedEvent(userId, amount, reason));
     }
 
     public void freezePoints(PointAmount amount, String exchangeRequestId) {
-        if (balance.isGreaterThan(amount) || balance.equals(amount)) {
-            this.balance = this.balance.subtract(amount);
-            this.frozenBalance = this.frozenBalance.add(amount);
-            PointTransaction transaction = new PointTransaction(userId, PointTransactionType.FREEZE, amount, "교환용 포인트 동결", exchangeRequestId);
-            transaction.setPointAccount(this);
-            this.transactions.add(transaction);
+        if (balance.compareTo(amount.getAmount()) >= 0) {
+            this.balance = this.balance.subtract(amount.getAmount());
+            this.frozenBalance = this.frozenBalance.add(amount.getAmount());
             addDomainEvent(new PointsFrozenEvent(userId, amount, exchangeRequestId));
         } else {
             throw new IllegalArgumentException("동결할 포인트가 부족합니다");
@@ -71,23 +55,29 @@ public class PointAccount extends AggregateRoot {
     }
 
     public void unfreezePoints(PointAmount amount, String exchangeRequestId) {
-        if (frozenBalance.isGreaterThan(amount) || frozenBalance.equals(amount)) {
-            this.frozenBalance = this.frozenBalance.subtract(amount);
-            this.balance = this.balance.add(amount);
-            PointTransaction transaction = new PointTransaction(userId, PointTransactionType.UNFREEZE, amount, "교환 취소로 인한 포인트 해제", exchangeRequestId);
-            transaction.setPointAccount(this);
-            this.transactions.add(transaction);
+        if (frozenBalance.compareTo(amount.getAmount()) >= 0) {
+            this.frozenBalance = this.frozenBalance.subtract(amount.getAmount());
+            this.balance = this.balance.add(amount.getAmount());
             addDomainEvent(new PointsUnfrozenEvent(userId, amount, exchangeRequestId));
         } else {
             throw new IllegalArgumentException("해제할 동결 포인트가 부족합니다");
         }
     }
 
+    public void receiveFreePoints(PointAmount amount) {
+        this.balance = this.balance.add(amount.getAmount());
+        addDomainEvent(new PointsEarnedEvent(userId, amount, "무료 포인트 수령"));
+    }
+
     public PointAmount getAvailableBalance() {
-        return balance;
+        return PointAmount.of(balance);
+    }
+
+    public PointAmount getFrozenBalance() {
+        return PointAmount.of(frozenBalance);
     }
 
     public PointAmount getTotalBalance() {
-        return balance.add(frozenBalance);
+        return PointAmount.of(balance.add(frozenBalance));
     }
 } 

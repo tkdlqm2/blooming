@@ -4,6 +4,7 @@ import com.bloominggrace.governance.point.domain.model.PointAccount;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.point.domain.model.PointTransaction;
 import com.bloominggrace.governance.point.infrastructure.repository.PointAccountRepository;
+import com.bloominggrace.governance.point.infrastructure.repository.PointTransactionRepository;
 import com.bloominggrace.governance.shared.domain.DomainEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.util.UUID;
 public class PointManagementService {
 
     private final PointAccountRepository pointAccountRepository;
+    private final PointTransactionRepository pointTransactionRepository;
     private final DomainEventPublisher eventPublisher;
 
     // 포인트 적립
@@ -44,6 +46,14 @@ public class PointManagementService {
         eventPublisher.publishAll(account.getDomainEvents());
     }
 
+    // 무료 포인트 수령
+    public void receiveFreePoints(UUID userId, PointAmount amount) {
+        PointAccount account = getOrCreatePointAccount(userId);
+        account.receiveFreePoints(amount);
+        pointAccountRepository.save(account);
+        eventPublisher.publishAll(account.getDomainEvents());
+    }
+
     // 포인트 잔액 조회
     @Transactional(readOnly = true)
     public PointBalance getPointBalance(UUID userId) {
@@ -58,11 +68,10 @@ public class PointManagementService {
     // 포인트 거래 내역 조회
     @Transactional(readOnly = true)
     public List<PointTransaction> getPointTransactions(UUID userId) {
-        PointAccount account = getPointAccount(userId);
-        return account.getTransactions();
+        return pointTransactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    private PointAccount getOrCreatePointAccount(UUID userId) {
+    public PointAccount getOrCreatePointAccount(UUID userId) {
         return pointAccountRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     PointAccount newAccount = new PointAccount(userId);

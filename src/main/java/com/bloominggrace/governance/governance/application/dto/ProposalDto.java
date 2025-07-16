@@ -44,18 +44,104 @@ public class ProposalDto {
     }
 
     public static ProposalDto from(Proposal proposal) {
-        return new ProposalDto(
-            proposal.getId().getValue(),
-            proposal.getCreatorId().getValue(),
-            proposal.getTitle(),
-            proposal.getDescription(),
-            proposal.getStatus().name(),
-            VotingPeriodDto.from(proposal.getVotingPeriod()),
-            VoteResultsDto.from(proposal.getVoteResults()),
-            proposal.getRequiredQuorum(),
-            proposal.getCreatedAt(),
-            proposal.getUpdatedAt()
-        );
+        return ProposalDto.builder()
+            .id(proposal.getId().getValue())
+            .creatorId(proposal.getCreatorId().getValue())
+            .title(proposal.getTitle())
+            .description(proposal.getDescription())
+            .status(proposal.getStatus().name())
+            .votingPeriod(VotingPeriodDto.from(proposal.getVotingPeriod()))
+            .voteResults(VoteResultsDto.from(proposal.getVoteResults()))
+            .requiredQuorum(proposal.getRequiredQuorum())
+            .createdAt(proposal.getCreatedAt())
+            .updatedAt(proposal.getUpdatedAt())
+            .build();
+    }
+    
+    public static ProposalDto from(Proposal proposal, String transactionSignature, String creatorWalletAddress) {
+        return ProposalDto.builder()
+            .id(proposal.getId().getValue())
+            .creatorId(proposal.getCreatorId().getValue())
+            .title(proposal.getTitle())
+            .description(proposal.getDescription())
+            .status(proposal.getStatus().name())
+            .votingPeriod(VotingPeriodDto.from(proposal.getVotingPeriod()))
+            .voteResults(VoteResultsDto.from(proposal.getVoteResults()))
+            .requiredQuorum(proposal.getRequiredQuorum())
+            .createdAt(proposal.getCreatedAt())
+            .updatedAt(proposal.getUpdatedAt())
+            .build();
+    }
+    
+    public static ProposalDtoBuilder builder() {
+        return new ProposalDtoBuilder();
+    }
+    
+    public static class ProposalDtoBuilder {
+        private UUID id;
+        private UUID creatorId;
+        private String title;
+        private String description;
+        private String status;
+        private VotingPeriodDto votingPeriod;
+        private VoteResultsDto voteResults;
+        private long requiredQuorum;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        
+        public ProposalDtoBuilder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+        
+        public ProposalDtoBuilder creatorId(UUID creatorId) {
+            this.creatorId = creatorId;
+            return this;
+        }
+        
+        public ProposalDtoBuilder title(String title) {
+            this.title = title;
+            return this;
+        }
+        
+        public ProposalDtoBuilder description(String description) {
+            this.description = description;
+            return this;
+        }
+        
+        public ProposalDtoBuilder status(String status) {
+            this.status = status;
+            return this;
+        }
+        
+        public ProposalDtoBuilder votingPeriod(VotingPeriodDto votingPeriod) {
+            this.votingPeriod = votingPeriod;
+            return this;
+        }
+        
+        public ProposalDtoBuilder voteResults(VoteResultsDto voteResults) {
+            this.voteResults = voteResults;
+            return this;
+        }
+        
+        public ProposalDtoBuilder requiredQuorum(long requiredQuorum) {
+            this.requiredQuorum = requiredQuorum;
+            return this;
+        }
+        
+        public ProposalDtoBuilder createdAt(LocalDateTime createdAt) {
+            this.createdAt = createdAt;
+            return this;
+        }
+        
+        public ProposalDtoBuilder updatedAt(LocalDateTime updatedAt) {
+            this.updatedAt = updatedAt;
+            return this;
+        }
+        
+        public ProposalDto build() {
+            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt);
+        }
     }
 
     public UUID getId() {

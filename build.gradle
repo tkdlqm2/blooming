@@ -37,12 +37,12 @@ dependencies {
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	
-	// Solana 관련 의존성 (실제 구현에서는 적절한 라이브러리 사용)
-	// implementation 'com.solana:solana-sdk:1.35.0'
-	implementation 'org.bitcoinj:bitcoinj-core:0.16.2'
-	
 	// Ethereum 관련 의존성
 	implementation 'org.web3j:core:4.10.3'
+	implementation 'org.web3j:web3j-spring-boot-starter:1.6.0'
+	
+	// Base58 인코딩 (BitcoinJ에서 제공)
+	// Ed25519 서명 (BouncyCastle에서 제공)
 	
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'

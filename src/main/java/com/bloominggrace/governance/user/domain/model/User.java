@@ -18,7 +18,6 @@ import java.util.UUID;
 public class User extends AggregateRoot {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
     @Column(unique = true, nullable = false)

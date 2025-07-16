@@ -1,11 +1,14 @@
 package com.bloominggrace.governance.wallet.domain.model;
 
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
+import com.bloominggrace.governance.token.domain.model.TokenAccount;
 import com.bloominggrace.governance.user.domain.model.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -15,7 +18,6 @@ import java.util.UUID;
 public class Wallet extends AggregateRoot {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -35,7 +37,11 @@ public class Wallet extends AggregateRoot {
     @Column(nullable = false)
     private boolean active = true;
 
+    @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TokenAccount> tokenAccounts = new ArrayList<>();
+
     public Wallet(User user, String walletAddress, NetworkType networkType, String encryptedPrivateKey) {
+        this.id = UUID.randomUUID();
         this.user = user;
         this.walletAddress = walletAddress;
         this.networkType = networkType;
@@ -53,5 +59,17 @@ public class Wallet extends AggregateRoot {
 
     public String getEncryptedPrivateKey() {
         return encryptedPrivateKey;
+    }
+
+    public void addTokenAccount(TokenAccount tokenAccount) {
+        this.tokenAccounts.add(tokenAccount);
+    }
+
+    public void removeTokenAccount(TokenAccount tokenAccount) {
+        this.tokenAccounts.remove(tokenAccount);
+    }
+
+    public List<TokenAccount> getTokenAccounts() {
+        return new ArrayList<>(tokenAccounts);
     }
 } 

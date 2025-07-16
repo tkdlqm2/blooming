@@ -154,33 +154,5 @@ public class UserController {
         }
     }
 
-    /**
-     * 사용자 역할 업데이트 (관리자용)
-     */
-    @PutMapping("/{id}/role")
-    public ResponseEntity<UserDto> updateUserRole(@PathVariable UUID id, @RequestParam String role) {
-        try {
-            // 현재는 간단한 구현이므로 실제로는 더 복잡한 로직이 필요
-            UserRole userRole = UserRole.valueOf(role.toUpperCase());
-            // TODO: 사용자 역할 업데이트 로직 구현
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
 
-    /**
-     * 사용자 삭제 (관리자용)
-     */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
-        try {
-            // TODO: 사용자 삭제 로직 구현
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
 } 

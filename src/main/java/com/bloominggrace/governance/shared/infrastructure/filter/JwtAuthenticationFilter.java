@@ -26,6 +26,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
     
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // 블록체인 API는 인증 없이 접근 가능하도록 설정
+        boolean shouldNotFilter = path.startsWith("/api/blockchain/") || 
+               path.startsWith("/api/users/signup") ||
+               path.startsWith("/api/users/login") ||
+               path.startsWith("/swagger-ui/") ||
+               path.startsWith("/v3/api-docs/") ||
+               path.startsWith("/h2-console/") ||
+               path.startsWith("/actuator/");
+        
+        System.out.println("JWT Filter - Path: " + path + ", Should not filter: " + shouldNotFilter);
+        return shouldNotFilter;
+    }
+    
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         

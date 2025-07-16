@@ -58,4 +58,14 @@ public class TokenTransactionRepositoryAdapter implements TokenTransactionReposi
     public void delete(TokenTransactionId id) {
         jpaRepository.deleteById(id);
     }
+    
+    @Override
+    public List<TokenTransaction> findByUserIdOrderByCreatedAtDesc(UserId userId) {
+        return jpaRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+    
+    @Override
+    public List<TokenTransaction> findByUserIdAndTransactionTypeOrderByCreatedAtDesc(UserId userId, TokenTransactionType transactionType) {
+        return jpaRepository.findByUserIdAndTransactionTypeOrderByCreatedAtDesc(userId, transactionType);
+    }
 } 

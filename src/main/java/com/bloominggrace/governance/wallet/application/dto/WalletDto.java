@@ -38,24 +38,71 @@ public class WalletDto {
     }
     
     public static WalletDto from(Wallet wallet) {
-        return new WalletDto(
-            wallet.getId(),
-            wallet.getUser() != null ? wallet.getUser().getId() : null,
-            wallet.getWalletAddress(),
-            wallet.getNetworkType(),
-            wallet.isActive()
-        );
+        return WalletDto.builder()
+            .id(wallet.getId())
+            .userId(wallet.getUser() != null ? wallet.getUser().getId() : null)
+            .walletAddress(wallet.getWalletAddress())
+            .networkType(wallet.getNetworkType())
+            .active(wallet.isActive())
+            .build();
     }
     
     public static WalletDto from(Wallet wallet, BigDecimal balance) {
-        return new WalletDto(
-            wallet.getId(),
-            wallet.getUser() != null ? wallet.getUser().getId() : null,
-            wallet.getWalletAddress(),
-            wallet.getNetworkType(),
-            wallet.isActive(),
-            balance
-        );
+        return WalletDto.builder()
+            .id(wallet.getId())
+            .userId(wallet.getUser() != null ? wallet.getUser().getId() : null)
+            .walletAddress(wallet.getWalletAddress())
+            .networkType(wallet.getNetworkType())
+            .active(wallet.isActive())
+            .balance(balance)
+            .build();
+    }
+    
+    public static WalletDtoBuilder builder() {
+        return new WalletDtoBuilder();
+    }
+    
+    public static class WalletDtoBuilder {
+        private UUID id;
+        private UUID userId;
+        private String walletAddress;
+        private NetworkType networkType;
+        private boolean active;
+        private BigDecimal balance;
+        
+        public WalletDtoBuilder id(UUID id) {
+            this.id = id;
+            return this;
+        }
+        
+        public WalletDtoBuilder userId(UUID userId) {
+            this.userId = userId;
+            return this;
+        }
+        
+        public WalletDtoBuilder walletAddress(String walletAddress) {
+            this.walletAddress = walletAddress;
+            return this;
+        }
+        
+        public WalletDtoBuilder networkType(NetworkType networkType) {
+            this.networkType = networkType;
+            return this;
+        }
+        
+        public WalletDtoBuilder active(boolean active) {
+            this.active = active;
+            return this;
+        }
+        
+        public WalletDtoBuilder balance(BigDecimal balance) {
+            this.balance = balance;
+            return this;
+        }
+        
+        public WalletDto build() {
+            return new WalletDto(id, userId, walletAddress, networkType, active, balance);
+        }
     }
     
     // Getters and Setters

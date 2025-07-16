@@ -1,10 +1,12 @@
 package com.bloominggrace.governance.point.domain.model;
 
 import com.bloominggrace.governance.shared.domain.ValueObject;
+import jakarta.persistence.Embeddable;
 
 import java.math.BigDecimal;
 import java.util.Objects;
 
+@Embeddable
 public class PointAmount extends ValueObject {
     private final BigDecimal amount;
 
@@ -49,6 +51,10 @@ public class PointAmount extends ValueObject {
 
     public boolean isGreaterThan(PointAmount other) {
         return this.amount.compareTo(other.amount) > 0;
+    }
+
+    public boolean equals(PointAmount other) {
+        return this.amount.compareTo(other.amount) == 0;
     }
 
     @Override

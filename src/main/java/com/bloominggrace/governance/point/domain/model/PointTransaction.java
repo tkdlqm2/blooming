@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,11 +26,8 @@ public class PointTransaction extends AggregateRoot {
     @Column(nullable = false)
     private PointTransactionType type;
 
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "amount", column = @Column(name = "amount", nullable = false))
-    })
-    private PointAmount amount;
+    @Column(name = "amount", nullable = false)
+    private BigDecimal amount;
 
     @Column(nullable = false)
     private String reason;
@@ -40,14 +38,10 @@ public class PointTransaction extends AggregateRoot {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "point_account_id")
-    private PointAccount pointAccount;
-
     public PointTransaction(UUID userId, PointTransactionType type, PointAmount amount, String reason) {
         this.userId = userId;
         this.type = type;
-        this.amount = amount;
+        this.amount = amount.getAmount();
         this.reason = reason;
         this.createdAt = LocalDateTime.now();
     }
@@ -55,9 +49,5 @@ public class PointTransaction extends AggregateRoot {
     public PointTransaction(UUID userId, PointTransactionType type, PointAmount amount, String reason, String exchangeRequestId) {
         this(userId, type, amount, reason);
         this.exchangeRequestId = exchangeRequestId;
-    }
-
-    public void setPointAccount(PointAccount pointAccount) {
-        this.pointAccount = pointAccount;
     }
 } 

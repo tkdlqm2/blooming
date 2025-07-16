@@ -1,8 +1,19 @@
 # Server Configuration
 server:
-  port: 8080
+  port: 8081
   servlet:
     context-path: /
+
+# Management Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
 
 # Database Configuration (H2 for development)
 spring:
@@ -29,20 +40,17 @@ spring:
         format_sql: true
         globally_quoted_identifiers: true
         globally_quoted_identifiers_skip_column_definitions: true
-  
-  # Redis Configuration (for caching and event storage)
-  redis:
-    host: localhost
-    port: 6379
-    timeout: 2000ms
 
 # Logging Configuration
 logging:
   level:
     com.bloominggrace.governance: DEBUG
-    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+    org.web3j: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"
 
 # Exchange Rate Configuration
 exchange:
@@ -56,17 +64,23 @@ governance:
   minimum-voting-power: 100
   default-voting-period-days: 7
 
-# Solana Configuration (for production)
-solana:
-  network: devnet
-  rpc-url: https://api.devnet.solana.com
-  wallet-path: /path/to/wallet.json 
+# Blockchain Configuration
+blockchain:
+  ethereum:
+    # Sepolia 테스트넷 (무료)
+    rpc-url: https://rpc.sepolia.org
+    network-id: 11155111
+    chain-id: 11155111
+  solana:
+    # Solana Devnet (무료)
+    rpc-url: https://api.devnet.solana.com
+    network-id: devnet
 
 # Encryption Key
 encryption:
-  key: "12345678901234567890123456789012" 
+  key: "12345678901234567890123456789012"
 
 jwt:
-  secret: "your-super-secret-jwt-key-that-is-at-least-256-bits-long-for-security"
-  expiration: 86400000  # 24 hours in milliseconds
+  secret: your-secret-key-here-make-it-long-and-secure-in-production
+  expiration: 86400000 # 24 hours in milliseconds
   issuer: "governance-platform" 

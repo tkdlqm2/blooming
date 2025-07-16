@@ -9,16 +9,24 @@ import com.bloominggrace.governance.token.domain.event.TokensStakedEvent;
 import com.bloominggrace.governance.token.domain.event.TokensUnstakedEvent;
 import com.bloominggrace.governance.token.domain.event.TokensTransferredEvent;
 import com.bloominggrace.governance.token.domain.event.TokensBurnedEvent;
+import com.bloominggrace.governance.wallet.domain.model.Wallet;
+import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "token_accounts")
 public class TokenAccount extends AggregateRoot {
     
-    @EmbeddedId
-    private TokenAccountId id;
+    @Id
+    private UUID id;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wallet_id", nullable = false)
+    private Wallet wallet;
     
     @Embedded
     @AttributeOverrides({
@@ -26,18 +34,30 @@ public class TokenAccount extends AggregateRoot {
     })
     private UserId userId;
     
-    @Column(name = "wallet_address", nullable = false, unique = true)
+    @Column(name = "total_balance", precision = 38, scale = 18, nullable = false)
+    private BigDecimal totalBalance = BigDecimal.ZERO;
+    
+    @Column(name = "staked_balance", precision = 38, scale = 18, nullable = false)
+    private BigDecimal stakedBalance = BigDecimal.ZERO;
+    
+    @Column(name = "available_balance", precision = 38, scale = 18, nullable = false)
+    private BigDecimal availableBalance = BigDecimal.ZERO;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "network", nullable = false)
+    private NetworkType network;
+    
+    @Column(name = "contract", nullable = false)
+    private String contract;
+    
+    @Column(name = "symbol", nullable = false)
+    private String symbol;
+    
+    @Column(name = "wallet_address", nullable = false)
     private String walletAddress;
     
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "totalBalance", column = @Column(name = "total_balance", precision = 20, scale = 8)),
-        @AttributeOverride(name = "stakedBalance", column = @Column(name = "staked_balance", precision = 20, scale = 8))
-    })
-    private TokenBalance balance;
-    
     @Column(name = "is_active", nullable = false)
-    private boolean isActive;
+    private boolean isActive = true;
     
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -47,30 +67,60 @@ public class TokenAccount extends AggregateRoot {
 
     protected TokenAccount() {}
 
-    public TokenAccount(UserId userId, String walletAddress) {
-        this.id = new TokenAccountId();
+    public TokenAccount(Wallet wallet, UserId userId, NetworkType network, String contract, String symbol) {
+        this.id = UUID.randomUUID();
+        this.wallet = wallet;
         this.userId = userId;
-        this.walletAddress = walletAddress;
-        this.balance = new TokenBalance("0", "0");
+        this.network = network;
+        this.contract = contract;
+        this.symbol = symbol;
+        this.walletAddress = wallet.getWalletAddress();
+        this.totalBalance = BigDecimal.ZERO;
+        this.stakedBalance = BigDecimal.ZERO;
+        this.availableBalance = BigDecimal.ZERO;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
-    public TokenAccountId getId() {
+    public UUID getId() {
         return id;
+    }
+
+    public Wallet getWallet() {
+        return wallet;
     }
 
     public UserId getUserId() {
         return userId;
     }
 
-    public String getWalletAddress() {
-        return walletAddress;
+    public BigDecimal getTotalBalance() {
+        return totalBalance;
     }
 
-    public TokenBalance getBalance() {
-        return balance;
+    public BigDecimal getStakedBalance() {
+        return stakedBalance;
+    }
+
+    public BigDecimal getAvailableBalance() {
+        return availableBalance;
+    }
+
+    public NetworkType getNetwork() {
+        return network;
+    }
+
+    public String getContract() {
+        return contract;
+    }
+
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public String getWalletAddress() {
+        return walletAddress;
     }
 
     public boolean isActive() {
@@ -85,80 +135,92 @@ public class TokenAccount extends AggregateRoot {
         return updatedAt;
     }
 
-    public void mintTokens(TokenAmount amount, String description) {
+    public void mintTokens(BigDecimal amount, String description) {
         if (!isActive) {
             throw new IllegalStateException("Token account is not active");
         }
         
-        TokenBalance newBalance = balance.addTokens(amount);
-        this.balance = newBalance;
+        this.totalBalance = this.totalBalance.add(amount);
+        this.availableBalance = this.availableBalance.add(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensMintedEvent(userId, amount, description));
+        addDomainEvent(new TokensMintedEvent(userId, new TokenAmount(amount.toString()), description));
     }
 
-    public void stakeTokens(TokenAmount amount) {
+    public void stakeTokens(BigDecimal amount) {
         if (!isActive) {
             throw new IllegalStateException("Token account is not active");
         }
         
-        if (!balance.hasAvailableBalance(amount)) {
+        if (this.availableBalance.compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient available balance for staking");
         }
         
-        TokenBalance newBalance = balance.stakeTokens(amount);
-        this.balance = newBalance;
+        this.availableBalance = this.availableBalance.subtract(amount);
+        this.stakedBalance = this.stakedBalance.add(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensStakedEvent(userId, amount));
+        addDomainEvent(new TokensStakedEvent(userId, new TokenAmount(amount.toString())));
     }
 
-    public void unstakeTokens(TokenAmount amount) {
+    public void unstakeTokens(BigDecimal amount) {
         if (!isActive) {
             throw new IllegalStateException("Token account is not active");
         }
         
-        if (!balance.hasStakedBalance(amount)) {
+        if (this.stakedBalance.compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient staked balance for unstaking");
         }
         
-        TokenBalance newBalance = balance.unstakeTokens(amount);
-        this.balance = newBalance;
+        this.stakedBalance = this.stakedBalance.subtract(amount);
+        this.availableBalance = this.availableBalance.add(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensUnstakedEvent(userId, amount));
+        addDomainEvent(new TokensUnstakedEvent(userId, new TokenAmount(amount.toString())));
     }
     
-    public void transferTokens(TokenAmount amount, String description) {
+    public void transferTokens(BigDecimal amount, String description) {
         if (!isActive) {
             throw new IllegalStateException("Token account is not active");
         }
         
-        if (!balance.hasAvailableBalance(amount)) {
+        if (this.availableBalance.compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient available balance for transfer");
         }
         
-        TokenBalance newBalance = balance.subtractTokens(amount);
-        this.balance = newBalance;
+        this.availableBalance = this.availableBalance.subtract(amount);
+        this.totalBalance = this.totalBalance.subtract(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensTransferredEvent(userId, null, amount, description));
+        addDomainEvent(new TokensTransferredEvent(userId, null, new TokenAmount(amount.toString()), description));
     }
     
-    public void burnTokens(TokenAmount amount, String description) {
+    public void burnTokens(BigDecimal amount, String description) {
         if (!isActive) {
             throw new IllegalStateException("Token account is not active");
         }
         
-        if (!balance.hasAvailableBalance(amount)) {
+        if (this.availableBalance.compareTo(amount) < 0) {
             throw new IllegalArgumentException("Insufficient available balance for burning");
         }
         
-        TokenBalance newBalance = balance.subtractTokens(amount);
-        this.balance = newBalance;
+        this.availableBalance = this.availableBalance.subtract(amount);
+        this.totalBalance = this.totalBalance.subtract(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensBurnedEvent(userId, amount, description));
+        addDomainEvent(new TokensBurnedEvent(userId, new TokenAmount(amount.toString()), description));
+    }
+    
+    public void receiveTokens(BigDecimal amount, String description) {
+        if (!isActive) {
+            throw new IllegalStateException("Token account is not active");
+        }
+        
+        this.totalBalance = this.totalBalance.add(amount);
+        this.availableBalance = this.availableBalance.add(amount);
+        this.updatedAt = LocalDateTime.now();
+        
+        addDomainEvent(new TokensTransferredEvent(null, wallet.getWalletAddress(), new TokenAmount(amount.toString()), description));
     }
 
     public void deactivate() {
@@ -169,7 +231,7 @@ public class TokenAccount extends AggregateRoot {
         this.isActive = false;
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokenAccountDeactivatedEvent(userId, walletAddress));
+        addDomainEvent(new TokenAccountDeactivatedEvent(userId, wallet.getWalletAddress()));
     }
 
     public void activate() {
@@ -180,20 +242,20 @@ public class TokenAccount extends AggregateRoot {
         this.isActive = true;
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokenAccountActivatedEvent(userId, walletAddress));
+        addDomainEvent(new TokenAccountActivatedEvent(userId, wallet.getWalletAddress()));
     }
 
-    public boolean hasAvailableBalance(TokenAmount amount) {
-        return balance.hasAvailableBalance(amount);
+    public boolean hasAvailableBalance(BigDecimal amount) {
+        return this.availableBalance.compareTo(amount) >= 0;
     }
 
-    public boolean hasStakedBalance(TokenAmount amount) {
-        return balance.hasStakedBalance(amount);
+    public boolean hasStakedBalance(BigDecimal amount) {
+        return this.stakedBalance.compareTo(amount) >= 0;
     }
 
     @Override
     public String toString() {
-        return String.format("TokenAccount{id=%s, userId=%s, walletAddress=%s, balance=%s, active=%s}",
-                           id, userId, walletAddress, balance, isActive);
+        return String.format("TokenAccount{id=%s, walletId=%s, userId=%s, network=%s, contract=%s, symbol=%s, totalBalance=%s, stakedBalance=%s, availableBalance=%s, active=%s}",
+                           id, wallet != null ? wallet.getId() : null, userId, network, contract, symbol, totalBalance, stakedBalance, availableBalance, isActive);
     }
 } 

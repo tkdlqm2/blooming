@@ -16,4 +16,14 @@ public interface TokenTransactionJpaRepository extends JpaRepository<TokenTransa
     List<TokenTransaction> findByUserIdAndTransactionType(UserId userId, TokenTransactionType transactionType);
     List<TokenTransaction> findByWalletAddress(String walletAddress);
     List<TokenTransaction> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
+    
+    /**
+     * 사용자 ID로 트랜잭션을 생성일 기준 내림차순으로 조회
+     */
+    List<TokenTransaction> findByUserIdOrderByCreatedAtDesc(UserId userId);
+    
+    /**
+     * 사용자 ID와 트랜잭션 타입으로 트랜잭션을 생성일 기준 내림차순으로 조회
+     */
+    List<TokenTransaction> findByUserIdAndTransactionTypeOrderByCreatedAtDesc(UserId userId, TokenTransactionType transactionType);
 } 

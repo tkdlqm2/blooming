@@ -37,17 +37,82 @@ public class VoteResultsDto {
     }
 
     public static VoteResultsDto from(VoteResults voteResults) {
-        return new VoteResultsDto(
-            voteResults.getTotalVotes(),
-            voteResults.getYesVotes(),
-            voteResults.getNoVotes(),
-            voteResults.getAbstainVotes(),
-            voteResults.getYesPercentage(),
-            voteResults.getNoPercentage(),
-            voteResults.getAbstainPercentage(),
-            voteResults.isPassed(),
-            voteResults.isRejected()
-        );
+        return VoteResultsDto.builder()
+            .totalVotes(voteResults.getTotalVotes())
+            .yesVotes(voteResults.getYesVotes())
+            .noVotes(voteResults.getNoVotes())
+            .abstainVotes(voteResults.getAbstainVotes())
+            .yesPercentage(voteResults.getYesPercentage())
+            .noPercentage(voteResults.getNoPercentage())
+            .abstainPercentage(voteResults.getAbstainPercentage())
+            .isPassed(voteResults.isPassed())
+            .isRejected(voteResults.isRejected())
+            .build();
+    }
+    
+    public static VoteResultsDtoBuilder builder() {
+        return new VoteResultsDtoBuilder();
+    }
+    
+    public static class VoteResultsDtoBuilder {
+        private long totalVotes;
+        private long yesVotes;
+        private long noVotes;
+        private long abstainVotes;
+        private BigDecimal yesPercentage;
+        private BigDecimal noPercentage;
+        private BigDecimal abstainPercentage;
+        private boolean isPassed;
+        private boolean isRejected;
+        
+        public VoteResultsDtoBuilder totalVotes(long totalVotes) {
+            this.totalVotes = totalVotes;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder yesVotes(long yesVotes) {
+            this.yesVotes = yesVotes;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder noVotes(long noVotes) {
+            this.noVotes = noVotes;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder abstainVotes(long abstainVotes) {
+            this.abstainVotes = abstainVotes;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder yesPercentage(BigDecimal yesPercentage) {
+            this.yesPercentage = yesPercentage;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder noPercentage(BigDecimal noPercentage) {
+            this.noPercentage = noPercentage;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder abstainPercentage(BigDecimal abstainPercentage) {
+            this.abstainPercentage = abstainPercentage;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder isPassed(boolean isPassed) {
+            this.isPassed = isPassed;
+            return this;
+        }
+        
+        public VoteResultsDtoBuilder isRejected(boolean isRejected) {
+            this.isRejected = isRejected;
+            return this;
+        }
+        
+        public VoteResultsDto build() {
+            return new VoteResultsDto(totalVotes, yesVotes, noVotes, abstainVotes, yesPercentage, noPercentage, abstainPercentage, isPassed, isRejected);
+        }
     }
 
     public long getTotalVotes() {

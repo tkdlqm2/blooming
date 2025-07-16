@@ -29,16 +29,8 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions().disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/users/**").permitAll()
-                .requestMatchers("/api/wallets/**").permitAll()
-                .requestMatchers("/api/tokens/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
+                .anyRequest().permitAll()
+            );
         return http.build();
     }
 
