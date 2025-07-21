@@ -18,24 +18,31 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.math.BigInteger;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.math.BigDecimal;
 
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
 import com.bloominggrace.governance.user.domain.model.User;
 import com.bloominggrace.governance.user.infrastructure.repository.UserRepository;
 import com.bloominggrace.governance.shared.util.Base58Utils;
+import org.springframework.context.ApplicationContext;
 
 @Service("solanaWalletService")
-public class SolanaWalletService implements WalletService {
+public class SolanaWalletService extends WalletService {
     
     private final WalletRepository walletRepository;
     private final EncryptionService encryptionService;
     private final UserRepository userRepository;
     
     public SolanaWalletService(
+            ApplicationContext applicationContext,
             WalletRepository walletRepository,
             EncryptionService encryptionService,
             UserRepository userRepository) {
+        super(applicationContext);
         this.walletRepository = walletRepository;
         this.encryptionService = encryptionService;
         this.userRepository = userRepository;
@@ -90,53 +97,8 @@ public class SolanaWalletService implements WalletService {
     
 
 
-    @Override
-    public byte[] sign(byte[] message, String privateKey) {
-        try {
-            // 개인키를 바이트 배열로 변환 (Solana는 64바이트 개인키 사용)
-            byte[] privateKeyBytes = hexStringToByteArray(privateKey);
-            
-            // Ed25519 개인키 파라미터 생성
-            Ed25519PrivateKeyParameters privateKeyParams = new Ed25519PrivateKeyParameters(privateKeyBytes, 0);
-            
-            // Ed25519 서명기 생성
-            Ed25519Signer signer = new Ed25519Signer();
-            signer.init(true, privateKeyParams);
-            
-            // 메시지 서명
-            signer.update(message, 0, message.length);
-            byte[] signature = signer.generateSignature();
-            
-            return signature;
-        } catch (Exception e) {
-            throw new RuntimeException("Solana sign error", e);
-        }
-    }
-    
-    public byte[] signTransaction(byte[] transactionData, String privateKey) {
-        try {
-            // 개인키를 바이트 배열로 변환 (Solana는 64바이트 개인키 사용)
-            byte[] privateKeyBytes = hexStringToByteArray(privateKey);
-            
-            // Ed25519 개인키 파라미터 생성
-            Ed25519PrivateKeyParameters privateKeyParams = new Ed25519PrivateKeyParameters(privateKeyBytes, 0);
-            
-            // Ed25519 서명기 생성
-            Ed25519Signer signer = new Ed25519Signer();
-            signer.init(true, privateKeyParams);
-            
-            // 트랜잭션 데이터 서명
-            signer.update(transactionData, 0, transactionData.length);
-            byte[] signature = signer.generateSignature();
-            
-            return signature;
-        } catch (Exception e) {
-            throw new RuntimeException("Solana transaction sign error", e);
-        }
-    }
-    
-    @Override
-    public <T> byte[] signTransactionBody(TransactionBody<T> transactionBody, String privateKey) {
+        @Override
+    public <T> byte[] sign(TransactionBody<T> transactionBody, String privateKey) {
         try {
             // 1. Solana 특화 필드들을 동적으로 설정
             SolanaTransactionData solanaData = createSolanaTransactionData(transactionBody);
@@ -156,10 +118,10 @@ public class SolanaWalletService implements WalletService {
             // 4. signedRawTransaction 생성 (서명 + 메시지)
             return createSignedRawTransaction(signature, messageBytes);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to sign Solana transaction", e);
+            throw new RuntimeException("Solana sign error", e);
         }
     }
-    
+
     /**
      * Solana 트랜잭션 데이터 생성 (네트워크별 특화 필드 포함)
      */

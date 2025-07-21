@@ -2,11 +2,10 @@ package com.bloominggrace.governance.token.domain.model;
 
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
 import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.infrastructure.converter.UserIdConverter;
 import com.bloominggrace.governance.token.domain.event.TokenAccountActivatedEvent;
 import com.bloominggrace.governance.token.domain.event.TokenAccountDeactivatedEvent;
 import com.bloominggrace.governance.token.domain.event.TokensMintedEvent;
-import com.bloominggrace.governance.token.domain.event.TokensStakedEvent;
-import com.bloominggrace.governance.token.domain.event.TokensUnstakedEvent;
 import com.bloominggrace.governance.token.domain.event.TokensTransferredEvent;
 import com.bloominggrace.governance.token.domain.event.TokensBurnedEvent;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
@@ -28,17 +27,12 @@ public class TokenAccount extends AggregateRoot {
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
     
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "value", column = @Column(name = "user_id"))
-    })
+    @Convert(converter = UserIdConverter.class)
+    @Column(name = "user_id", nullable = false)
     private UserId userId;
     
     @Column(name = "total_balance", precision = 38, scale = 18, nullable = false)
     private BigDecimal totalBalance = BigDecimal.ZERO;
-    
-    @Column(name = "staked_balance", precision = 38, scale = 18, nullable = false)
-    private BigDecimal stakedBalance = BigDecimal.ZERO;
     
     @Column(name = "available_balance", precision = 38, scale = 18, nullable = false)
     private BigDecimal availableBalance = BigDecimal.ZERO;
@@ -76,7 +70,6 @@ public class TokenAccount extends AggregateRoot {
         this.symbol = symbol;
         this.walletAddress = wallet.getWalletAddress();
         this.totalBalance = BigDecimal.ZERO;
-        this.stakedBalance = BigDecimal.ZERO;
         this.availableBalance = BigDecimal.ZERO;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
@@ -97,10 +90,6 @@ public class TokenAccount extends AggregateRoot {
 
     public BigDecimal getTotalBalance() {
         return totalBalance;
-    }
-
-    public BigDecimal getStakedBalance() {
-        return stakedBalance;
     }
 
     public BigDecimal getAvailableBalance() {
@@ -145,38 +134,6 @@ public class TokenAccount extends AggregateRoot {
         this.updatedAt = LocalDateTime.now();
         
         addDomainEvent(new TokensMintedEvent(userId, new TokenAmount(amount.toString()), description));
-    }
-
-    public void stakeTokens(BigDecimal amount) {
-        if (!isActive) {
-            throw new IllegalStateException("Token account is not active");
-        }
-        
-        if (this.availableBalance.compareTo(amount) < 0) {
-            throw new IllegalArgumentException("Insufficient available balance for staking");
-        }
-        
-        this.availableBalance = this.availableBalance.subtract(amount);
-        this.stakedBalance = this.stakedBalance.add(amount);
-        this.updatedAt = LocalDateTime.now();
-        
-        addDomainEvent(new TokensStakedEvent(userId, new TokenAmount(amount.toString())));
-    }
-
-    public void unstakeTokens(BigDecimal amount) {
-        if (!isActive) {
-            throw new IllegalStateException("Token account is not active");
-        }
-        
-        if (this.stakedBalance.compareTo(amount) < 0) {
-            throw new IllegalArgumentException("Insufficient staked balance for unstaking");
-        }
-        
-        this.stakedBalance = this.stakedBalance.subtract(amount);
-        this.availableBalance = this.availableBalance.add(amount);
-        this.updatedAt = LocalDateTime.now();
-        
-        addDomainEvent(new TokensUnstakedEvent(userId, new TokenAmount(amount.toString())));
     }
     
     public void transferTokens(BigDecimal amount, String description) {
@@ -249,13 +206,9 @@ public class TokenAccount extends AggregateRoot {
         return this.availableBalance.compareTo(amount) >= 0;
     }
 
-    public boolean hasStakedBalance(BigDecimal amount) {
-        return this.stakedBalance.compareTo(amount) >= 0;
-    }
-
     @Override
     public String toString() {
-        return String.format("TokenAccount{id=%s, walletId=%s, userId=%s, network=%s, contract=%s, symbol=%s, totalBalance=%s, stakedBalance=%s, availableBalance=%s, active=%s}",
-                           id, wallet != null ? wallet.getId() : null, userId, network, contract, symbol, totalBalance, stakedBalance, availableBalance, isActive);
+        return String.format("TokenAccount{id=%s, walletId=%s, userId=%s, network=%s, contract=%s, symbol=%s, totalBalance=%s, availableBalance=%s, active=%s}",
+                           id, wallet != null ? wallet.getId() : null, userId, network, contract, symbol, totalBalance, availableBalance, isActive);
     }
 } 

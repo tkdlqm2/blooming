@@ -67,32 +67,6 @@ public class WalletController {
     }
 
     /**
-     * 사용자 ID와 네트워크를 기반으로 메시지를 서명합니다.
-     * 
-     * @param userId 사용자 ID
-     * @param message 서명할 메시지 (Base64 인코딩)
-     * @param networkType 네트워크 타입
-     * @return 서명 결과 (Base64 인코딩)
-     */
-    @PostMapping("/sign-message-by-user")
-    public ResponseEntity<String> signMessageByUser(@RequestParam String userId,
-                                                   @RequestParam String message,
-                                                   @RequestParam String networkType) {
-        try {
-            UserId user = new UserId(UUID.fromString(userId));
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            byte[] messageBytes = java.util.Base64.getDecoder().decode(message);
-            byte[] signature = walletApplicationService.signMessageByUser(user, messageBytes, type);
-            String signatureBase64 = java.util.Base64.getEncoder().encodeToString(signature);
-            return ResponseEntity.ok(signatureBase64);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("메시지 서명 실패: " + e.getMessage());
-        }
-    }
-
-    /**
      * 특정 지갑을 조회합니다.
      * 
      * @param id 지갑 ID
@@ -175,6 +149,12 @@ public class WalletController {
             @RequestParam BigDecimal amount,
             @RequestParam String networkType) {
         try {
+            System.out.println("createNativeTransferTransactionBody called with:");
+            System.out.println("  fromAddress: " + fromAddress);
+            System.out.println("  toAddress: " + toAddress);
+            System.out.println("  amount: " + amount);
+            System.out.println("  networkType: " + networkType);
+            
             NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
             
             // 새로운 통합 메서드를 사용하여 트랜잭션 생성
@@ -183,6 +163,8 @@ public class WalletController {
                 fromAddress, toAddress, amount, null, transferData, 
                 TransactionRequest.TransactionType.TOKEN_TRANSFER, type
             );
+            
+            System.out.println("TransactionBody created with nonce: " + transactionBody.getNonce());
             
             return ResponseEntity.ok(TransactionBodyResponse.from(transactionBody));
         } catch (IllegalArgumentException e) {
@@ -337,7 +319,24 @@ public class WalletController {
     public ResponseEntity<String> broadcastTransaction(
             @RequestBody SignedRawTransactionRequest request) {
         try {
-            byte[] signedRawTransaction = java.util.Base64.getDecoder().decode(request.getSignedRawTransaction());
+            // Base64 디코딩을 더 안전하게 처리
+            String signedRawTransactionBase64 = request.getSignedRawTransaction();
+            if (signedRawTransactionBase64 == null || signedRawTransactionBase64.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("브로드캐스트 실패: signedRawTransaction이 비어있습니다.");
+            }
+            
+            // Base64 패딩 추가 (필요한 경우)
+            while (signedRawTransactionBase64.length() % 4 != 0) {
+                signedRawTransactionBase64 += "=";
+            }
+            
+            byte[] signedRawTransaction;
+            try {
+                signedRawTransaction = java.util.Base64.getDecoder().decode(signedRawTransactionBase64);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body("브로드캐스트 실패: 잘못된 Base64 형식입니다. " + e.getMessage());
+            }
+            
             String transactionHash = walletApplicationService.broadcastSignedTransaction(
                 signedRawTransaction, request.getNetworkType());
             
@@ -345,6 +344,17 @@ public class WalletController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("브로드캐스트 실패: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 바이트 배열을 hex 문자열로 변환하는 헬퍼 메서드
+     */
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder();
+        for (byte b : bytes) {
+            result.append(String.format("%02x", b));
+        }
+        return result.toString();
     }
 
     // ===== DTO 클래스들 =====
@@ -416,12 +426,15 @@ public class WalletController {
         private Object createNetworkSpecificData(String networkType, String toAddress) {
             switch (networkType.toUpperCase()) {
                 case "ETHEREUM":
-                    return com.bloominggrace.governance.shared.domain.model.EthereumTransactionData.builder()
-                        .gasPrice(java.math.BigInteger.valueOf(20000000000L))
-                        .gasLimit(java.math.BigInteger.valueOf(21000L))
-                        .value(java.math.BigInteger.ZERO)
-                        .contractAddress(toAddress)
-                        .build();
+                    return new com.bloominggrace.governance.shared.domain.model.EthereumTransactionData(
+                        java.math.BigInteger.valueOf(20000000000L),
+                        java.math.BigInteger.valueOf(21000L),
+                        java.math.BigInteger.ZERO,
+                        toAddress,
+                        toAddress,
+                        null,
+                        java.math.BigInteger.ZERO
+                    );
                 case "SOLANA":
                     return com.bloominggrace.governance.shared.domain.model.SolanaTransactionData.builder()
                         .recentBlockhash("11111111111111111111111111111111")

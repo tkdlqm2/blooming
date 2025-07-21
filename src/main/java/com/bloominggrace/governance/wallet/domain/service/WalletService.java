@@ -1,19 +1,50 @@
 package com.bloominggrace.governance.wallet.domain.service;
 
-import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.shared.domain.model.TransactionBody;
 import com.bloominggrace.governance.shared.domain.model.SignedTransaction;
+import com.bloominggrace.governance.wallet.domain.model.Wallet;
+import org.springframework.context.ApplicationContext;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * 지갑 서비스 인터페이스
+ * 지갑 서비스 추상 클래스
  * 지갑 생성, 조회, 관리 기능을 담당하는 도메인 서비스
  */
-public interface WalletService {
+public abstract class WalletService {
+    
+    protected ApplicationContext applicationContext;
+    
+    public WalletService(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
+    
+    /**
+     * 지갑 주소로 복호화된 개인키를 가져옵니다.
+     * 공통 함수로 모든 구현체에서 사용할 수 있습니다.
+     *
+     * @param fromWalletAddress 지갑 주소
+     * @return 복호화된 개인키
+     */
+    public String getDecryptedPrivateKey(String fromWalletAddress) {
+        com.bloominggrace.governance.wallet.application.service.WalletApplicationService walletApplicationService = 
+            applicationContext.getBean(com.bloominggrace.governance.wallet.application.service.WalletApplicationService.class);
+        
+        Optional<Wallet> walletOpt = walletApplicationService.getWalletByAddress(fromWalletAddress);
+        if (walletOpt.isEmpty()) {
+            throw new RuntimeException("Wallet not found for address: " + fromWalletAddress);
+        }
+        Wallet wallet = walletOpt.get();
+        return walletApplicationService.getDecryptedPrivateKey(
+            new UserId(wallet.getUser().getId()),
+            wallet.getNetworkType()
+        );
+    }
     
     /**
      * 새로운 지갑을 생성합니다.
@@ -22,7 +53,7 @@ public interface WalletService {
      * @param networkType 네트워크 타입 (ETHEREUM, SOLANA 등)
      * @return 생성된 지갑
      */
-    Wallet createWallet(UserId userId, NetworkType networkType);
+    public abstract Wallet createWallet(UserId userId, NetworkType networkType);
     
     /**
      * 지갑 주소로 지갑을 조회합니다.
@@ -30,7 +61,7 @@ public interface WalletService {
      * @param walletAddress 지갑 주소
      * @return 지갑 정보
      */
-    Optional<Wallet> findByAddress(String walletAddress);
+    public abstract Optional<Wallet> findByAddress(String walletAddress);
     
     /**
      * 사용자의 모든 지갑을 조회합니다.
@@ -38,7 +69,7 @@ public interface WalletService {
      * @param userId 사용자 ID
      * @return 사용자의 지갑 목록
      */
-    List<Wallet> findByUserId(UserId userId);
+    public abstract List<Wallet> findByUserId(UserId userId);
     
     /**
      * 지갑을 저장합니다.
@@ -46,7 +77,7 @@ public interface WalletService {
      * @param wallet 저장할 지갑
      * @return 저장된 지갑
      */
-    Wallet save(Wallet wallet);
+    public abstract Wallet save(Wallet wallet);
 
     
     /**
@@ -56,32 +87,25 @@ public interface WalletService {
      * @param active 활성화 여부
      * @return 업데이트된 지갑
      */
-    Wallet updateActiveStatus(String walletAddress, boolean active);
+    public abstract Wallet updateActiveStatus(String walletAddress, boolean active);
 
 
     /**
      * 주어진 메시지에 대해 개인키로 서명합니다.
      *
-     * @param message 서명할 메시지 (byte[])
      * @param privateKey 개인키 (hex string)
      * @return 서명 결과 (byte[])
      */
-    byte[] sign(byte[] message, String privateKey);
+    public abstract <T> byte[] sign(TransactionBody<T> transactionBody, String privateKey);
+
+
 
     /**
-     * TransactionBody를 서명하여 인코딩된 signedRawTransaction을 반환합니다.
-     * 각 네트워크별 구현체에서 구체적인 서명 및 인코딩 로직을 구현합니다.
+     * 지갑 주소의 유효성을 검증합니다.
      *
-     * @param transactionBody 서명할 트랜잭션 본문
-     * @param privateKey 개인키 (hex string)
-     * @return 인코딩된 signedRawTransaction (byte[])
+     * @param address 검증할 지갑 주소
+     * @return 유효성 여부
      */
-    <T> byte[] signTransactionBody(TransactionBody<T> transactionBody, String privateKey);
+    public abstract boolean isValidAddress(String address);
 
-    /**
-     * 지갑 주소 유효성 검증
-     * @param address 지갑 주소
-     * @return 유효한 경우 true
-     */
-    boolean isValidAddress(String address);
 } 

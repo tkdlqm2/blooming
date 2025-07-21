@@ -25,8 +25,6 @@ public class TransactionBody<T> {
         PROPOSAL_VOTE,    // 정책 투표
         TOKEN_MINT,       // 토큰 민팅
         TOKEN_BURN,       // 토큰 소각
-        TOKEN_STAKE,      // 토큰 스테이킹
-        TOKEN_UNSTAKE,    // 토큰 언스테이킹
         TOKEN_TRANSFER    // 토큰 전송
     }
     
@@ -56,7 +54,29 @@ public class TransactionBody<T> {
         this.toAddress = toAddress;
         this.data = data;
         this.timestamp = LocalDateTime.now();
-        this.nonce = System.currentTimeMillis(); // 실제로는 블록체인에서 관리
+        this.nonce = System.currentTimeMillis(); // 기본값으로 타임스탬프 사용
+        this.networkType = networkType;
+        this.networkSpecificData = networkSpecificData;
+    }
+    
+    /**
+     * 트랜잭션 본문 생성 (nonce 포함 생성자)
+     */
+    public TransactionBody(
+            TransactionType type,
+            String fromAddress,
+            String toAddress,
+            String data,
+            String networkType,
+            T networkSpecificData,
+            long nonce) {
+        this.transactionId = UUID.randomUUID();
+        this.type = type;
+        this.fromAddress = fromAddress;
+        this.toAddress = toAddress;
+        this.data = data;
+        this.timestamp = LocalDateTime.now();
+        this.nonce = nonce; // 전달받은 nonce 사용
         this.networkType = networkType;
         this.networkSpecificData = networkSpecificData;
     }

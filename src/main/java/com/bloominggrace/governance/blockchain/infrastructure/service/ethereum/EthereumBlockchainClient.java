@@ -1,27 +1,26 @@
 package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum;
 
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
+import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcError;
 import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcRequest;
 import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcResponse;
-import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcError;
 import com.bloominggrace.governance.shared.util.HexUtils;
+import com.bloominggrace.governance.shared.util.JsonRpcClient;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.TransactionEncoder;
+import org.web3j.utils.Numeric;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,7 +31,7 @@ import java.util.Map;
 @Service("ethereumBlockchainClient")
 public class EthereumBlockchainClient implements BlockchainClient {
     
-    private final HttpClient httpClient;
+    private final JsonRpcClient jsonRpcClient;
     private final ObjectMapper objectMapper;
     private final String rpcUrl;
     
@@ -42,10 +41,15 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Value("${blockchain.ethereum.chain-id:11155111}")
     private String chainId;
     
-    public EthereumBlockchainClient(@Value("${blockchain.ethereum.rpc-url}") String rpcUrl) {
+    @Value("${blockchain.ethereum.admin-private-key}")
+    private String adminPrivateKey;
+
+    public EthereumBlockchainClient(@Value("${blockchain.ethereum.rpc-url}") String rpcUrl,
+                                   JsonRpcClient jsonRpcClient,
+                                   ObjectMapper objectMapper) {
         this.rpcUrl = rpcUrl;
-        this.httpClient = HttpClient.newHttpClient();
-        this.objectMapper = new ObjectMapper();
+        this.jsonRpcClient = jsonRpcClient;
+        this.objectMapper = objectMapper;
         log.info("EthereumBlockchainClient initialized with RPC URL: {}", rpcUrl);
         log.info("Configuration check - rpcUrl value: '{}'", rpcUrl);
     }
@@ -59,16 +63,23 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getLatestBlockHash() {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByNumber", Arrays.asList("latest", false));
-            EthereumRpcResponse<Map<String, Object>> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get latest block hash: {}", response.getError().getMessage());
                 return null;
             }
             
-            return (String) response.getResult().get("hash");
+            if (response.getResult() == null) {
+                log.error("Received null result from Ethereum RPC");
+                return null;
+            }
+            
+            String hash = (String) response.getResult().get("hash");
+            log.info("Successfully got latest block hash: {}", hash);
+            return hash;
         } catch (Exception e) {
-            log.error("Error getting latest block hash", e);
+            log.error("Error getting latest block hash: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -77,7 +88,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getGasPrice() {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_gasPrice", Arrays.asList());
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get gas price: {}", response.getError().getMessage());
@@ -102,7 +113,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             );
             
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_estimateGas", Arrays.asList(transaction));
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Gas estimation error: {}", response.getError().getMessage());
@@ -121,7 +132,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getNonce(String address) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionCount", Arrays.asList(address, "latest"));
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get nonce: {}", response.getError().getMessage());
@@ -140,7 +151,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getBalance(String address) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBalance", Arrays.asList(address, "latest"));
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get balance: {}", response.getError().getMessage());
@@ -158,16 +169,33 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getTokenBalance(String tokenAddress, String walletAddress) {
         try {
+            log.info("=== EthereumBlockchainClient.getTokenBalance Debug ===");
+            log.info("Token Address: {}", tokenAddress);
+            log.info("Wallet Address: {}", walletAddress);
+            log.info("RPC URL: {}", rpcUrl);
+            
             // ERC20 balanceOf 함수 호출
             String balanceOfData = "0x70a08231" + padLeft(walletAddress.substring(2), 64);
+            log.info("BalanceOf Data: {}", balanceOfData);
             
             Map<String, String> transaction = Map.of(
                 "to", tokenAddress,
                 "data", balanceOfData
             );
+            log.info("RPC Transaction: {}", transaction);
             
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_call", Arrays.asList(transaction, "latest"));
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            log.info("RPC Request: {}", request);
+            
+            // 직접 curl 명령어 출력 (디버깅용)
+            String curlCommand = String.format(
+                "curl -X POST %s -H \"Content-Type: application/json\" -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"%s\",\"data\":\"%s\"},\"latest\"],\"id\":1}'",
+                rpcUrl, tokenAddress, balanceOfData
+            );
+            log.info("Equivalent curl command: {}", curlCommand);
+            
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            log.info("RPC Response: {}", response);
             
             if (response.hasError()) {
                 log.error("Token balance query error: {}", response.getError().getMessage());
@@ -175,11 +203,23 @@ public class EthereumBlockchainClient implements BlockchainClient {
             }
             
             String result = response.getResult();
-            if (result.equals("0x")) {
+            log.info("Raw RPC Result: {}", result);
+            
+            if (result == null) {
+                log.error("RPC result is null");
                 return "0";
             }
             
-            return new BigInteger(result.substring(2), 16).toString();
+            if (result.equals("0x")) {
+                log.info("Empty result, returning 0");
+                return "0";
+            }
+            
+            String balance = new BigInteger(result.substring(2), 16).toString();
+            log.info("Parsed Balance: {}", balance);
+            log.info("=== End Debug ===");
+            
+            return balance;
         } catch (Exception e) {
             log.error("Error getting token balance for token: {} wallet: {}", tokenAddress, walletAddress, e);
             return "0";
@@ -189,22 +229,52 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String broadcastTransaction(String signedTransaction) {
         try {
+            log.info("=== Ethereum Transaction Broadcast Debug ===");
             log.info("Broadcasting Ethereum raw transaction: {}", signedTransaction);
+            log.info("RPC URL: {}", rpcUrl);
+            log.info("Network ID: {}", networkId);
+            log.info("Chain ID: {}", chainId);
             
+            // 서명된 트랜잭션 형식 검증
+            if (signedTransaction == null || signedTransaction.trim().isEmpty()) {
+                log.error("Signed transaction is null or empty");
+                return null;
+            }
+            
+            if (!signedTransaction.startsWith("0x")) {
+                log.error("Signed transaction must start with 0x: {}", signedTransaction);
+                return null;
+            }
+            
+            log.info("Signed transaction format validation passed");
+
+            // 실제 RPC 호출 코드 (운영 환경에서 사용)
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_sendRawTransaction", Arrays.asList(signedTransaction));
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            log.info("RPC Request: {}", request);
+            
+            log.info("Sending request to RPC endpoint...");
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            log.info("RPC Response: {}", response);
             
             if (response.hasError()) {
                 log.error("Transaction broadcast error: {}", response.getError().getMessage());
+                log.error("Error details: {}", response.getError());
+                log.error("Error code: {}", response.getError().getCode());
                 return null;
             }
             
             String transactionHash = response.getResult();
             log.info("Transaction broadcast successful. Hash: {}", transactionHash);
+            log.info("=== End Debug ===");
             
             return transactionHash;
+
         } catch (Exception e) {
+            log.error("=== Ethereum Transaction Broadcast Exception ===");
             log.error("Error broadcasting transaction", e);
+            log.error("Exception type: {}", e.getClass().getSimpleName());
+            log.error("Exception message: {}", e.getMessage());
+            log.error("=== End Exception Debug ===");
             return null;
         }
     }
@@ -213,7 +283,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getTransactionStatus(String transactionHash) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionReceipt", Arrays.asList(transactionHash));
-            EthereumRpcResponse<Map<String, Object>> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get transaction status: {}", response.getError().getMessage());
@@ -240,7 +310,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getTransactionReceipt(String transactionHash) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionReceipt", Arrays.asList(transactionHash));
-            EthereumRpcResponse<Map<String, Object>> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get transaction receipt: {}", response.getError().getMessage());
@@ -258,7 +328,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getBlockByHash(String blockHash) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByHash", Arrays.asList(blockHash, false));
-            EthereumRpcResponse<Map<String, Object>> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get block by hash: {}", response.getError().getMessage());
@@ -276,7 +346,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getBlockByNumber(String blockNumber) {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByNumber", Arrays.asList(blockNumber, false));
-            EthereumRpcResponse<Map<String, Object>> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get block by number: {}", response.getError().getMessage());
@@ -294,7 +364,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     public String getNetworkStatus() {
         try {
             EthereumRpcRequest request = EthereumRpcRequest.of("net_listening", Arrays.asList());
-            EthereumRpcResponse<Boolean> response = sendRequest(request, new TypeReference<EthereumRpcResponse<Boolean>>() {});
+            EthereumRpcResponse<Boolean> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Boolean>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get network status: {}", response.getError().getMessage());
@@ -326,7 +396,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             EthereumRpcRequest request = EthereumRpcRequest.of("eth_blockNumber", Arrays.asList());
             log.debug("Sending request: {}", request);
             
-            EthereumRpcResponse<String> response = sendRequest(request, new TypeReference<EthereumRpcResponse<String>>() {});
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             log.debug("Received response: {}", response);
             
             if (response.hasError()) {
@@ -355,115 +425,124 @@ public class EthereumBlockchainClient implements BlockchainClient {
             BigInteger price = new BigInteger(gasPrice);
             BigInteger limit = new BigInteger(gasLimit);
             BigInteger fee = price.multiply(limit);
-            
-            // Wei를 ETH로 변환 (1 ETH = 10^18 Wei)
-            BigDecimal feeInEth = new BigDecimal(fee).divide(BigDecimal.valueOf(10).pow(18));
-            return feeInEth.toString();
+            return fee.toString();
         } catch (Exception e) {
             log.error("Error calculating transaction fee", e);
             return "0";
         }
     }
-    
-    @Override
-    public String createTokenTransferData(String toAddress, String amount) {
-        // ERC20 transfer 함수 호출 데이터 생성
-        String methodId = "0xa9059cbb"; // transfer(address,uint256)
-        String paddedTo = padLeft(toAddress.substring(2), 64);
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedTo + paddedAmount;
-    }
-    
-    @Override
-    public String createTokenApproveData(String spender, String amount) {
-        // ERC20 approve 함수 호출 데이터 생성
-        String methodId = "0x095ea7b3"; // approve(address,uint256)
-        String paddedSpender = padLeft(spender.substring(2), 64);
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedSpender + paddedAmount;
-    }
-    
-    @Override
-    public String createTokenMintData(String toAddress, String amount) {
-        // ERC20 mint 함수 호출 데이터 생성 (표준 ERC20에는 없지만 커스텀 토큰에서 사용)
-        String methodId = "0x40c10f19"; // mint(address,uint256)
-        String paddedTo = padLeft(toAddress.substring(2), 64);
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedTo + paddedAmount;
-    }
-    
-    @Override
-    public String createTokenBurnData(String amount) {
-        // ERC20 burn 함수 호출 데이터 생성
-        String methodId = "0x42966c68"; // burn(uint256)
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedAmount;
-    }
-    
-    @Override
-    public String createTokenStakeData(String amount) {
-        // 스테이킹 함수 호출 데이터 생성 (커스텀 토큰에서 사용)
-        String methodId = "0x2e17de78"; // stake(uint256)
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedAmount;
-    }
-    
-    @Override
-    public String createTokenUnstakeData(String amount) {
-        // 언스테이킹 함수 호출 데이터 생성 (커스텀 토큰에서 사용)
-        String methodId = "0x9f678cca"; // unstake(uint256)
-        String paddedAmount = padLeft(new BigInteger(amount).toString(16), 64);
-        return methodId + paddedAmount;
-    }
-    
-    @Override
-    public String createProposalData(String proposalId, String title, String description, String proposalFee) {
-        // 제안 생성 함수 호출 데이터 생성 (커스텀 컨트랙트에서 사용)
-        String methodId = "0x01234567"; // createProposal(string,string,uint256)
-        String encodedTitle = encodeString(title);
-        String encodedDescription = encodeString(description);
-        String paddedFee = padLeft(new BigInteger(proposalFee).toString(16), 64);
-        return methodId + encodedTitle + encodedDescription + paddedFee;
-    }
-    
-    @Override
-    public String createVoteData(String proposalId, String voteType, String votingPower, String reason) {
-        // 투표 함수 호출 데이터 생성 (커스텀 컨트랙트에서 사용)
-        String methodId = "0x89abcdef"; // vote(uint256,uint8,uint256,string)
-        String paddedProposalId = padLeft(new BigInteger(proposalId).toString(16), 64);
-        String paddedVoteType = padLeft(new BigInteger(voteType).toString(16), 64);
-        String paddedVotingPower = padLeft(new BigInteger(votingPower).toString(16), 64);
-        String encodedReason = encodeString(reason);
-        return methodId + paddedProposalId + paddedVoteType + paddedVotingPower + encodedReason;
-    }
-    
-    private <T> T sendRequest(EthereumRpcRequest request, TypeReference<T> typeReference) throws IOException, InterruptedException {
-        String requestBody = objectMapper.writeValueAsString(request);
-        log.info("Sending HTTP request to {}: {}", rpcUrl, requestBody);
-        
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(rpcUrl))
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
-                .build();
-        
-        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        log.info("Received HTTP response status: {}, body: {}", response.statusCode(), response.body());
-        
-        if (response.statusCode() != 200) {
-            log.error("HTTP request failed with status: {} and body: {}", response.statusCode(), response.body());
-            throw new IOException("HTTP request failed with status: " + response.statusCode() + ", body: " + response.body());
-        }
-        
+
+    /**
+     * ETH 전송을 수행합니다.
+     */
+    public String transferETH(String fromAddress, String toAddress, BigDecimal amount, BigInteger nonce) {
         try {
-            return objectMapper.readValue(response.body(), typeReference);
+            log.info("Starting ETH transfer - From: {}, To: {}, Amount: {} ETH, Nonce: {}", 
+                fromAddress, toAddress, amount, nonce);
+            
+            // Admin 지갑 Credentials 생성
+            Credentials credentials = Credentials.create(adminPrivateKey);
+            
+            // Gas price 조회
+            BigInteger gasPrice = new BigInteger(getGasPrice());
+            BigInteger gasLimit = BigInteger.valueOf(21000); // ETH 전송 기본 가스 한도
+            
+            // 전송 금액을 Wei로 변환
+            BigInteger amountInWei = amount.multiply(BigDecimal.valueOf(1e18)).toBigInteger();
+            
+            // RawTransaction 생성
+            RawTransaction rawTransaction = RawTransaction.createEtherTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                toAddress,
+                amountInWei
+            );
+            
+            // 트랜잭션 서명
+            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
+            String hexValue = Numeric.toHexString(signedMessage);
+            
+            // 트랜잭션 브로드캐스트
+            String transactionHash = broadcastTransaction(hexValue);
+            
+            log.info("ETH transfer completed - Hash: {}", transactionHash);
+            return transactionHash;
+            
         } catch (Exception e) {
-            log.error("Failed to parse response: {}", response.body(), e);
-            throw e;
+            log.error("ETH transfer failed", e);
+            throw new RuntimeException("ETH transfer failed: " + e.getMessage(), e);
         }
     }
-    
+
+    /**
+     * ERC20 토큰 전송을 수행합니다.
+     */
+    public String transferERC20Token(String fromAddress, String toAddress, String tokenAddress, BigDecimal amount, BigInteger nonce) {
+        try {
+            log.info("Starting ERC20 transfer - From: {}, To: {}, Token: {}, Amount: {}, Nonce: {}", 
+                fromAddress, toAddress, tokenAddress, amount, nonce);
+            
+            // Admin 지갑 Credentials 생성
+            Credentials credentials = Credentials.create(adminPrivateKey);
+            
+            // Gas price 조회
+            BigInteger gasPrice = new BigInteger(getGasPrice());
+            BigInteger gasLimit = BigInteger.valueOf(100_000L); // ERC20 전송 가스 한도
+            
+            // ERC-20 transfer 함수 데이터 생성
+            BigInteger amountWei = amount.multiply(BigDecimal.valueOf(1e18)).toBigInteger();
+            String transferData = createERC20TransferData(toAddress, amountWei);
+            
+            // RawTransaction 생성
+            RawTransaction rawTransaction = RawTransaction.createTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                tokenAddress, // 토큰 컨트랙트 주소
+                transferData
+            );
+            
+            // 트랜잭션 서명
+            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
+            String hexValue = Numeric.toHexString(signedMessage);
+            
+            // 트랜잭션 브로드캐스트
+            String transactionHash = broadcastTransaction(hexValue);
+            
+            log.info("ERC20 transfer completed - Hash: {}", transactionHash);
+            return transactionHash;
+            
+        } catch (Exception e) {
+            log.error("ERC20 transfer failed", e);
+            throw new RuntimeException("ERC20 transfer failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ERC-20 transfer 함수 데이터 생성
+     */
+    private String createERC20TransferData(String toAddress, BigInteger amount) {
+        try {
+            // ERC-20 transfer 함수 selector: transfer(address,uint256)
+            String functionSelector = "0xa9059cbb";
+            
+            // toAddress (20 bytes, padded to 32 bytes)
+            String paddedToAddress = "000000000000000000000000" + toAddress.substring(2);
+            
+            // amount (32 bytes, padded)
+            String paddedAmount = String.format("%064x", amount);
+            
+            String data = functionSelector + paddedToAddress + paddedAmount;
+            log.info("Created ERC-20 transfer data: {}", data);
+            
+            return data;
+        } catch (Exception e) {
+            log.error("Error creating ERC-20 transfer data", e);
+            throw new RuntimeException("Failed to create ERC-20 transfer data", e);
+        }
+    }
+
     private String padLeft(String value, int length) {
         return String.format("%" + length + "s", value).replace(' ', '0');
     }

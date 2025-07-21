@@ -83,4 +83,24 @@ public class TokenAccountRepositoryAdapter implements TokenAccountRepository {
     public boolean existsByWalletAndContract(Wallet wallet, String contract) {
         return jpaRepository.existsByWalletAndContract(wallet, contract);
     }
+    
+    @Override
+    public Optional<TokenAccount> findByUserIdAndNetworkAndContract(UserId userId, NetworkType network, String contract) {
+        return jpaRepository.findByUserIdAndNetworkAndContract(userId, network, contract);
+    }
+    
+    @Override
+    public List<TokenAccount> findByUserIdAndNetwork(UserId userId, NetworkType network) {
+        return jpaRepository.findByUserIdAndNetwork(userId, network);
+    }
+    
+    @Override
+    public boolean existsByUserIdAndNetworkAndContract(UserId userId, NetworkType network, String contract) {
+        return jpaRepository.existsByUserIdAndNetworkAndContract(userId, network, contract);
+    }
+    
+    @Override
+    public Optional<TokenAccount> findByWalletAddressAndNetworkAndContract(String walletAddress, NetworkType network, String contract) {
+        return jpaRepository.findByWalletAddressAndNetworkAndContract(walletAddress, network, contract);
+    }
 } 

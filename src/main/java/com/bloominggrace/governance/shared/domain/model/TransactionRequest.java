@@ -3,6 +3,7 @@ package com.bloominggrace.governance.shared.domain.model;
 import lombok.Value;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 
 /**
  * 트랜잭션 생성을 위한 요청 데이터
@@ -20,8 +21,6 @@ public class TransactionRequest {
         PROPOSAL_VOTE,    // 정책 투표
         TOKEN_MINT,       // 토큰 민팅
         TOKEN_BURN,       // 토큰 소각
-        TOKEN_STAKE,      // 토큰 스테이킹
-        TOKEN_UNSTAKE,    // 토큰 언스테이킹
         TOKEN_TRANSFER    // 토큰 전송
     }
     
@@ -32,6 +31,7 @@ public class TransactionRequest {
     String tokenAddress;          // 토큰 주소 (선택적)
     String networkType;           // 네트워크 타입
     TransactionType type;         // 트랜잭션 타입
+    BigInteger nonce;             // nonce (이더리움용, 선택적)
     
     // 트랜잭션별 고유 데이터 (Object로 추상화)
     Object transactionData;       // 트랜잭션 타입별 고유 데이터
@@ -130,44 +130,6 @@ public class TransactionRequest {
             .networkType(networkType)
             .type(TransactionType.TOKEN_MINT)
             .transactionData(mintData)
-            .build();
-    }
-    
-    /**
-     * 토큰 스테이킹용 요청 생성
-     */
-    public static TransactionRequest createTokenStakeRequest(
-            String fromAddress,
-            BigDecimal amount,
-            String networkType) {
-        
-        TokenStakeData stakeData = TokenStakeData.builder().build();
-        
-        return TransactionRequest.builder()
-            .fromAddress(fromAddress)
-            .amount(amount)
-            .networkType(networkType)
-            .type(TransactionType.TOKEN_STAKE)
-            .transactionData(stakeData)
-            .build();
-    }
-    
-    /**
-     * 토큰 언스테이킹용 요청 생성
-     */
-    public static TransactionRequest createTokenUnstakeRequest(
-            String fromAddress,
-            BigDecimal amount,
-            String networkType) {
-        
-        TokenUnstakeData unstakeData = TokenUnstakeData.builder().build();
-        
-        return TransactionRequest.builder()
-            .fromAddress(fromAddress)
-            .amount(amount)
-            .networkType(networkType)
-            .type(TransactionType.TOKEN_UNSTAKE)
-            .transactionData(unstakeData)
             .build();
     }
     
@@ -288,11 +250,10 @@ public class TransactionRequest {
     }
     
     /**
-     * 토큰 전송 데이터 (추가 데이터 없음)
+     * 토큰 전송 데이터
      */
     @Value
     public static class TokenTransferData {
-        // fromAddress, toAddress, amount, tokenAddress는 공통 필드로 처리
         
         public static TokenTransferDataBuilder builder() {
             return new TokenTransferDataBuilder();
@@ -331,42 +292,6 @@ public class TransactionRequest {
     }
     
     /**
-     * 토큰 스테이킹 데이터 (추가 데이터 없음)
-     */
-    @Value
-    public static class TokenStakeData {
-        // fromAddress, amount는 공통 필드로 처리
-        
-        public static TokenStakeDataBuilder builder() {
-            return new TokenStakeDataBuilder();
-        }
-        
-        public static class TokenStakeDataBuilder {
-            public TokenStakeData build() {
-                return new TokenStakeData();
-            }
-        }
-    }
-    
-    /**
-     * 토큰 언스테이킹 데이터 (추가 데이터 없음)
-     */
-    @Value
-    public static class TokenUnstakeData {
-        // fromAddress, amount는 공통 필드로 처리
-        
-        public static TokenUnstakeDataBuilder builder() {
-            return new TokenUnstakeDataBuilder();
-        }
-        
-        public static class TokenUnstakeDataBuilder {
-            public TokenUnstakeData build() {
-                return new TokenUnstakeData();
-            }
-        }
-    }
-    
-    /**
      * 토큰 소각 데이터
      */
     @Value
@@ -391,7 +316,8 @@ public class TransactionRequest {
         }
     }
     
-    // TransactionRequest Builder
+    // ===== Builder 패턴 =====
+    
     public static TransactionRequestBuilder builder() {
         return new TransactionRequestBuilder();
     }
@@ -403,6 +329,7 @@ public class TransactionRequest {
         private String tokenAddress;
         private String networkType;
         private TransactionType type;
+        private BigInteger nonce;
         private Object transactionData;
         
         public TransactionRequestBuilder fromAddress(String fromAddress) {
@@ -435,13 +362,18 @@ public class TransactionRequest {
             return this;
         }
         
+        public TransactionRequestBuilder nonce(BigInteger nonce) {
+            this.nonce = nonce;
+            return this;
+        }
+        
         public TransactionRequestBuilder transactionData(Object transactionData) {
             this.transactionData = transactionData;
             return this;
         }
         
         public TransactionRequest build() {
-            return new TransactionRequest(fromAddress, toAddress, amount, tokenAddress, networkType, type, transactionData);
+            return new TransactionRequest(fromAddress, toAddress, amount, tokenAddress, networkType, type, nonce, transactionData);
         }
     }
 } 

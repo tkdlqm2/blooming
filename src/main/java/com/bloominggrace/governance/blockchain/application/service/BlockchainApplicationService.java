@@ -1,13 +1,16 @@
 package com.bloominggrace.governance.blockchain.application.service;
 
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
+import com.bloominggrace.governance.blockchain.application.service.BlockchainClientFactory;
 import com.bloominggrace.governance.wallet.application.service.WalletServiceFactory;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
+import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.math.BigInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +18,7 @@ public class BlockchainApplicationService {
 
     private final BlockchainClientFactory blockchainClientFactory;
     private final WalletServiceFactory walletServiceFactory;
+    private final AdminWalletService adminWalletService;
 
     /**
      * 잔액을 조회합니다.
@@ -132,8 +136,47 @@ public class BlockchainApplicationService {
      * 체인 ID를 조회합니다.
      */
     public String getChainId(NetworkType networkType) {
-        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
-        return blockchainClient.getChainId();
+        BlockchainClient client = blockchainClientFactory.getClient(networkType);
+        return client.getChainId();
+    }
+
+    /**
+     * Admin 지갑의 nonce 캐시를 초기화합니다.
+     */
+    public void resetAdminNonce(NetworkType networkType) {
+        adminWalletService.clearNonceCache(networkType);
+    }
+
+    /**
+     * Admin 지갑의 nonce를 강제로 블록체인에서 다시 로딩합니다.
+     */
+    public String reloadAdminNonce(NetworkType networkType) {
+        BigInteger nonce = adminWalletService.forceReloadAdminWalletNonce(networkType);
+        return nonce.toString();
+    }
+
+    /**
+     * Admin 지갑의 nonce를 0으로 강제 설정합니다 (테스트용).
+     */
+    public String setAdminNonceToZero(NetworkType networkType) {
+        BigInteger nonce = adminWalletService.forceSetAdminWalletNonceToZero(networkType);
+        return nonce.toString();
+    }
+
+    /**
+     * Admin 지갑의 nonce를 자동으로 증가시킵니다.
+     */
+    public String incrementAdminNonce(NetworkType networkType) {
+        BigInteger nonce = adminWalletService.incrementAdminNonce(networkType);
+        return nonce.toString();
+    }
+
+    /**
+     * Admin 지갑의 현재 nonce를 가져옵니다.
+     */
+    public String getCurrentAdminNonce(NetworkType networkType) {
+        BigInteger nonce = adminWalletService.getCurrentAdminNonce(networkType);
+        return nonce.toString();
     }
 
     /**

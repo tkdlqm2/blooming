@@ -64,11 +64,6 @@ public class PointAccount extends AggregateRoot {
         }
     }
 
-    public void receiveFreePoints(PointAmount amount) {
-        this.balance = this.balance.add(amount.getAmount());
-        addDomainEvent(new PointsEarnedEvent(userId, amount, "무료 포인트 수령"));
-    }
-
     public PointAmount getAvailableBalance() {
         return PointAmount.of(balance);
     }

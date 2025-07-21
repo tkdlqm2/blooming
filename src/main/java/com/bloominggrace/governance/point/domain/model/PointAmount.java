@@ -8,7 +8,12 @@ import java.util.Objects;
 
 @Embeddable
 public class PointAmount extends ValueObject {
-    private final BigDecimal amount;
+    private BigDecimal amount;
+
+    // JPA를 위한 기본 생성자
+    protected PointAmount() {
+        this.amount = BigDecimal.ZERO;
+    }
 
     public PointAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {

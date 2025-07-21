@@ -4,6 +4,8 @@ import com.bloominggrace.governance.exchange.application.service.ExchangeApplica
 import com.bloominggrace.governance.exchange.domain.model.ExchangeRequest;
 import com.bloominggrace.governance.exchange.domain.model.ExchangeRequestId;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
+import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,22 +20,30 @@ import java.util.UUID;
 public class ExchangeController {
     
     private final ExchangeApplicationService exchangeApplicationService;
+    private final JwtService jwtService;
     
     /**
      * 포인트를 토큰으로 교환 요청
      */
     @PostMapping("/request")
-    public ResponseEntity<ExchangeRequestResponse> requestExchange(@RequestBody ExchangeRequestRequest request) {
+    public ResponseEntity<ExchangeRequestResponse> requestExchange(
+            @RequestBody ExchangeRequestRequest request,
+            @RequestHeader("Authorization") String authorization) {
         try {
-            PointAmount pointAmount = new PointAmount(request.pointAmount());
-            ExchangeRequestId exchangeRequestId = exchangeApplicationService.requestExchange(
-                request.userId(), 
-                pointAmount, 
+            // JWT 토큰에서 Bearer 제거
+            String token = authorization.replace("Bearer ", "");
+            
+            // JWT 토큰에서 사용자 ID 추출
+            UUID userId = jwtService.getUserIdFromToken(token);
+            
+            ExchangeRequest exchangeRequest = exchangeApplicationService.createExchangeRequest(
+                new UserId(userId), 
+                request.pointAmount(), 
                 request.walletAddress()
             );
             
             return ResponseEntity.ok(new ExchangeRequestResponse(
-                exchangeRequestId.getValue(),
+                exchangeRequest.getId().getValue(),
                 "교환 요청이 생성되었습니다"
             ));
         } catch (Exception e) {
@@ -50,7 +60,7 @@ public class ExchangeController {
     @PostMapping("/{exchangeRequestId}/process")
     public ResponseEntity<String> processExchange(@PathVariable UUID exchangeRequestId) {
         try {
-            exchangeApplicationService.processExchange(new ExchangeRequestId(exchangeRequestId));
+            exchangeApplicationService.processExchangeRequest(new ExchangeRequestId(exchangeRequestId));
             return ResponseEntity.ok("교환이 처리되었습니다");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("교환 처리 실패: " + e.getMessage());
@@ -58,62 +68,49 @@ public class ExchangeController {
     }
     
     /**
-     * 교환 완료
-     */
-    @PostMapping("/{exchangeRequestId}/complete")
-    public ResponseEntity<String> completeExchange(@PathVariable UUID exchangeRequestId) {
-        try {
-            exchangeApplicationService.completeExchange(new ExchangeRequestId(exchangeRequestId));
-            return ResponseEntity.ok("교환이 완료되었습니다");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("교환 완료 실패: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 교환 취소
-     */
-    @PostMapping("/{exchangeRequestId}/cancel")
-    public ResponseEntity<String> cancelExchange(@PathVariable UUID exchangeRequestId) {
-        try {
-            exchangeApplicationService.cancelExchange(new ExchangeRequestId(exchangeRequestId));
-            return ResponseEntity.ok("교환이 취소되었습니다");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("교환 취소 실패: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 사용자의 교환 요청 목록 조회
-     */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<ExchangeRequest>> getExchangeRequests(@PathVariable UUID userId) {
-        try {
-            List<ExchangeRequest> requests = exchangeApplicationService.getExchangeRequests(userId);
-            return ResponseEntity.ok(requests);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
-    
-    /**
-     * 특정 교환 요청 조회
+     * 교환 요청 조회
      */
     @GetMapping("/{exchangeRequestId}")
     public ResponseEntity<ExchangeRequest> getExchangeRequest(@PathVariable UUID exchangeRequestId) {
         try {
-            return exchangeApplicationService.getExchangeRequest(new ExchangeRequestId(exchangeRequestId))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+            ExchangeRequest exchangeRequest = exchangeApplicationService.getExchangeRequest(new ExchangeRequestId(exchangeRequestId));
+            return ResponseEntity.ok(exchangeRequest);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
         }
     }
     
+    /**
+     * 테스트용 교환 요청 생성 (JWT 인증 없음)
+     */
+    @PostMapping("/test-request")
+    public ResponseEntity<ExchangeRequestResponse> testRequestExchange(
+            @RequestBody ExchangeRequestRequest request) {
+        try {
+            // 테스트용 사용자 ID 사용
+            UUID testUserId = UUID.randomUUID();
+            
+            ExchangeRequest exchangeRequest = exchangeApplicationService.createExchangeRequest(
+                new UserId(testUserId), 
+                request.pointAmount(), 
+                request.walletAddress()
+            );
+            
+            return ResponseEntity.ok(new ExchangeRequestResponse(
+                exchangeRequest.getId().getValue(),
+                "테스트 교환 요청이 생성되었습니다"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ExchangeRequestResponse(
+                null,
+                "테스트 교환 요청 실패: " + e.getMessage()
+            ));
+        }
+    }
+
     // ===== DTO 클래스들 =====
     
     public record ExchangeRequestRequest(
-        UUID userId,
         BigDecimal pointAmount,
         String walletAddress
     ) {}

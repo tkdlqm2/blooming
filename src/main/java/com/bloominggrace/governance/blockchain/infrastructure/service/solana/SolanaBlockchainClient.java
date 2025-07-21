@@ -259,48 +259,6 @@ public class SolanaBlockchainClient implements BlockchainClient {
         return "200000"; // 기본 가스 한도
     }
 
-    @Override
-    public String createTokenTransferData(String toAddress, String amount) {
-        // 실제 Solana SPL 토큰 전송 명령어 데이터 생성
-        // 이는 복잡한 바이너리 데이터이므로 실제 구현에서는 Solana SDK 필요
-        return "transfer_instruction_data_" + toAddress + "_" + amount;
-    }
-
-    @Override
-    public String createTokenApproveData(String spender, String amount) {
-        return "approve_instruction_data_" + spender + "_" + amount;
-    }
-
-    @Override
-    public String createTokenMintData(String toAddress, String amount) {
-        return "mint_instruction_data_" + toAddress + "_" + amount;
-    }
-
-    @Override
-    public String createTokenBurnData(String amount) {
-        return "burn_instruction_data_" + amount;
-    }
-
-    @Override
-    public String createTokenStakeData(String amount) {
-        return "stake_instruction_data_" + amount;
-    }
-
-    @Override
-    public String createTokenUnstakeData(String amount) {
-        return "unstake_instruction_data_" + amount;
-    }
-
-    @Override
-    public String createProposalData(String proposalId, String title, String description, String proposalFee) {
-        return "create_proposal_instruction_data_" + proposalId + "_" + title + "_" + description + "_" + proposalFee;
-    }
-
-    @Override
-    public String createVoteData(String proposalId, String voteType, String votingPower, String reason) {
-        return "vote_instruction_data_" + proposalId + "_" + voteType + "_" + votingPower + "_" + reason;
-    }
-
     private <T> T sendRequest(JsonRequest request, TypeReference<T> typeReference) throws IOException, InterruptedException {
         String requestBody = objectMapper.writeValueAsString(request);
         

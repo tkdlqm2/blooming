@@ -35,11 +35,18 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
         globally_quoted_identifiers: true
         globally_quoted_identifiers_skip_column_definitions: true
+  
+  # SQL 초기화 설정
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
 
 # Logging Configuration
 logging:
@@ -67,14 +74,39 @@ governance:
 # Blockchain Configuration
 blockchain:
   ethereum:
-    # Sepolia 테스트넷 (무료)
-    rpc-url: https://rpc.sepolia.org
+    # Sepolia 테스트넷 (Infura 무료 계정 사용)
+    rpc-url: https://eth-sepolia.g.alchemy.com/public
     network-id: 11155111
     chain-id: 11155111
+    # Admin 지갑 개인키 (실제 운영에서는 환경변수로 관리)
+    # 이 개인키는 Sepolia 테스트넷에 실제 잔액이 있어야 함
+    admin-private-key: "0xa604ff9a1806e3ab62089e9427a91d69972e08b4768e97533cbe7353ef1aab77"
+    # Ethereum 컨트랙트 주소들
+    governance-contract: "0x0000000000000000000000000000000000000000"  # 배포된 거버넌스 컨트랙트 주소
+    token-contract: "0x0000000000000000000000000000000000000000"       # 배포된 토큰 컨트랙트 주소
   solana:
     # Solana Devnet (무료)
     rpc-url: https://api.devnet.solana.com
     network-id: devnet
+    # Solana 프로그램 ID들
+    governance-program-id: "11111111111111111111111111111111"  # 배포된 거버넌스 프로그램 ID
+    token-program-id: "11111111111111111111111111111111"       # 배포된 토큰 프로그램 ID
+    # Solana 관련 계정들
+    mint-account: "11111111111111111111111111111111"        # 토큰 민트 계정
+    treasury-account: "11111111111111111111111111111111"    # 재무 계정
+
+# Token Configuration
+token:
+  ethereum:
+    contract-address: "0xeafF00556BC06464511319dAb26D6CAC148b89d0"  # 실제 GovernanceToken 컨트랙트 주소
+    symbol: "GOV"
+    decimals: 18
+    name: "Governance Token"
+  solana:
+    contract-address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"  # Solana SPL Token 프로그램 ID
+    symbol: "SOL_TOKEN"
+    decimals: 9
+    name: "Solana Governance Token"
 
 # Encryption Key
 encryption:

@@ -1,7 +1,6 @@
 package com.bloominggrace.governance.governance.application.dto;
 
 import com.bloominggrace.governance.governance.domain.model.VoteType;
-import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,6 +16,5 @@ public class VoteRequest {
     private VoteType voteType;
     private String reason;
     private String voterWalletAddress;
-    private PointAmount votingPower;
     private NetworkType networkType;
 } 

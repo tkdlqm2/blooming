@@ -72,9 +72,6 @@ public class SolanaTransactionBodyFactory implements TransactionBodyFactory {
             case TOKEN_MINT:
             case TOKEN_BURN:
                 return 8000L;  // 0.000008 SOL (토큰 작업)
-            case TOKEN_STAKE:
-            case TOKEN_UNSTAKE:
-                return 7000L;  // 0.000007 SOL (스테이킹)
             case TOKEN_TRANSFER:
                 return 5000L;  // 0.000005 SOL (토큰 전송)
             default:
@@ -92,8 +89,6 @@ public class SolanaTransactionBodyFactory implements TransactionBodyFactory {
                 return "GovernanceProgram111111111111111111111111111"; // 가상의 거버넌스 프로그램 ID
             case TOKEN_MINT:
             case TOKEN_BURN:
-            case TOKEN_STAKE:
-            case TOKEN_UNSTAKE:
             case TOKEN_TRANSFER:
                 return "TokenProgram111111111111111111111111111111"; // 가상의 토큰 프로그램 ID
             default:
@@ -131,10 +126,6 @@ public class SolanaTransactionBodyFactory implements TransactionBodyFactory {
                 return String.format("{\"amount\":\"%s\",\"description\":\"%s\",\"type\":\"TOKEN_BURN\"}", 
                     request.getAmount().toString(), burnData.getDescription() != null ? burnData.getDescription() : "");
             }
-            case TOKEN_STAKE:
-                return String.format("{\"amount\":\"%s\",\"type\":\"TOKEN_STAKE\"}", request.getAmount().toString());
-            case TOKEN_UNSTAKE:
-                return String.format("{\"amount\":\"%s\",\"type\":\"TOKEN_UNSTAKE\"}", request.getAmount().toString());
             default:
                 return "{}";
         }
@@ -153,10 +144,6 @@ public class SolanaTransactionBodyFactory implements TransactionBodyFactory {
                 return TransactionBody.TransactionType.TOKEN_MINT;
             case TOKEN_BURN:
                 return TransactionBody.TransactionType.TOKEN_BURN;
-            case TOKEN_STAKE:
-                return TransactionBody.TransactionType.TOKEN_STAKE;
-            case TOKEN_UNSTAKE:
-                return TransactionBody.TransactionType.TOKEN_UNSTAKE;
             case TOKEN_TRANSFER:
                 return TransactionBody.TransactionType.TOKEN_TRANSFER;
             default:

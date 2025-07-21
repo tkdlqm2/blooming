@@ -23,4 +23,10 @@ public interface TokenAccountRepository {
     void delete(UUID id);
     boolean existsByUserId(UserId userId);
     boolean existsByWalletAndContract(Wallet wallet, String contract);
+    
+    // 새로운 메서드들 추가
+    Optional<TokenAccount> findByUserIdAndNetworkAndContract(UserId userId, NetworkType network, String contract);
+    List<TokenAccount> findByUserIdAndNetwork(UserId userId, NetworkType network);
+    boolean existsByUserIdAndNetworkAndContract(UserId userId, NetworkType network, String contract);
+    Optional<TokenAccount> findByWalletAddressAndNetworkAndContract(String walletAddress, NetworkType network, String contract);
 } 

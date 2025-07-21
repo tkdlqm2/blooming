@@ -12,8 +12,6 @@ public enum BlockchainTransactionType {
     // 토큰 관련 블록체인 트랜잭션
     TOKEN_MINT("토큰 민팅"),
     TOKEN_BURN("토큰 소각"),
-    TOKEN_STAKE("토큰 스테이킹"),
-    TOKEN_UNSTAKE("토큰 언스테이킹"),
     TOKEN_TRANSFER("토큰 전송");
 
     private final String description;

@@ -45,12 +45,13 @@ public class UserController {
                 return ResponseEntity.badRequest().build();
             }
 
-            // 사용자 생성 (기본 역할: USER)
+            // 사용자 생성 (요청에서 받은 역할 사용)
+            UserRole role = request.getRole() != null ? UserRole.valueOf(request.getRole()) : UserRole.USER;
             User user = userService.createUser(
                 request.getEmail(),
                 request.getUsername(),
                 request.getPassword(),
-                UserRole.USER
+                role
             );
 
             // JWT 토큰 생성

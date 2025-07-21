@@ -46,18 +46,10 @@ public class PointManagementService {
         eventPublisher.publishAll(account.getDomainEvents());
     }
 
-    // 무료 포인트 수령
-    public void receiveFreePoints(UUID userId, PointAmount amount) {
-        PointAccount account = getOrCreatePointAccount(userId);
-        account.receiveFreePoints(amount);
-        pointAccountRepository.save(account);
-        eventPublisher.publishAll(account.getDomainEvents());
-    }
-
     // 포인트 잔액 조회
     @Transactional(readOnly = true)
     public PointBalance getPointBalance(UUID userId) {
-        PointAccount account = getPointAccount(userId);
+        PointAccount account = getOrCreatePointAccount(userId);
         return new PointBalance(
             account.getAvailableBalance(),
             account.getFrozenBalance(),
@@ -77,6 +69,15 @@ public class PointManagementService {
                     PointAccount newAccount = new PointAccount(userId);
                     return pointAccountRepository.save(newAccount);
                 });
+    }
+
+    // 무료 포인트 지급
+    public void receiveFreePoints(UUID userId) {
+        PointAccount account = getOrCreatePointAccount(userId);
+        PointAmount freeAmount = PointAmount.of(1000); // 1000 포인트 지급
+        account.earnPoints(freeAmount, "무료 포인트 지급");
+        pointAccountRepository.save(account);
+        eventPublisher.publishAll(account.getDomainEvents());
     }
 
     private PointAccount getPointAccount(UUID userId) {

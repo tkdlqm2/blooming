@@ -6,12 +6,13 @@ import com.bloominggrace.governance.governance.infrastructure.repository.Proposa
 import com.bloominggrace.governance.governance.infrastructure.repository.VoteRepository;
 import com.bloominggrace.governance.governance.application.dto.*;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
-import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.token.application.service.TokenApplicationService;
 import com.bloominggrace.governance.shared.domain.model.BlockchainTransactionType;
 import com.bloominggrace.governance.shared.domain.model.Transaction;
 import com.bloominggrace.governance.shared.infrastructure.repository.TransactionRepository;
+import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
+import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator.TransactionResult;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,9 +24,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.TransactionRequest;
-
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,9 +31,9 @@ public class GovernanceApplicationService {
     
     private final ProposalRepository proposalRepository;
     private final VoteRepository voteRepository;
-    private final WalletApplicationService walletApplicationService;
     private final TokenApplicationService tokenApplicationService;
     private final TransactionRepository transactionRepository;
+    private final TransactionOrchestrator transactionOrchestrator;
     
     // ===== 거버넌스 관련 메서드들 =====
     
@@ -66,28 +64,25 @@ public class GovernanceApplicationService {
         Proposal proposal = new Proposal(creatorId, title, description, votingPeriod, requiredQuorum);
         proposal = proposalRepository.save(proposal);
         
-        // 3. 실제 블록체인 네트워크에 정책 제안 트랜잭션 생성
-        TransactionRequest.ProposalData proposalData = TransactionRequest.ProposalData.builder()
-            .proposalId(proposal.getId().getValue().toString())
-            .title(title)
-            .description(description)
-            .proposalFee(proposalFee)
-            .build();
-        TransactionBody txBody = walletApplicationService.createTransactionBody(
+        // 3. TransactionOrchestrator를 통해 트랜잭션 생성 및 브로드캐스트
+        TransactionResult txResult = transactionOrchestrator.executeProposalCreation(
+            proposal.getId().getValue(),
+            title,
+            description,
             creatorWalletAddress,
-            null,
-            null,
-            null,
-            proposalData,
-            TransactionRequest.TransactionType.PROPOSAL_CREATE,
-            NetworkType.valueOf(networkType.toUpperCase())
+            networkTypeEnum,
+            proposalFee,
+            votingStartDate,
+            votingEndDate,
+            BigDecimal.valueOf(requiredQuorum)
         );
-        byte[] signedRawTransaction = walletApplicationService.signTransactionBody(txBody, creatorWalletAddress);
-        String transactionSignature = walletApplicationService.broadcastSignedTransaction(signedRawTransaction, networkType);
+        
+        if (!txResult.isSuccess()) {
+            throw new RuntimeException("Failed to create proposal transaction: " + txResult.getErrorMessage());
+        }
         
         // 4. 토큰 차감 (제안 수수료) - 실제 블록체인에서 이미 처리됨
         tokenAccount.burnTokens(proposalFee, "제안 수수료: " + proposal.getTitle());
-        // tokenAccountRepository.save(tokenAccount); // TokenApplicationService에서 처리됨
         
         // 5. 블록체인 트랜잭션 기록 (실제 블록체인 트랜잭션 해시 저장)
         Transaction transaction = new Transaction(
@@ -99,22 +94,21 @@ public class GovernanceApplicationService {
             null, // BURN은 toAddress 없음
             "제안 수수료: " + proposal.getTitle()
         );
-        transaction.confirm(transactionSignature); // 실제 블록체인 트랜잭션 해시
+        transaction.confirm(txResult.getTransactionHash()); // 실제 블록체인 트랜잭션 해시
         transactionRepository.save(transaction);
         
-        return ProposalDto.from(proposal, transactionSignature, creatorWalletAddress);
+        return ProposalDto.from(proposal, txResult.getTransactionHash(), creatorWalletAddress);
     }
     
     /**
-     * 투표 (블록체인 트랜잭션 포함)
+     * 투표 (스냅샷 방식 - 토큰 소각 없음)
      */
-    public VoteDto voteWithTransaction(
+    public VoteDto voteWithSnapshot(
             ProposalId proposalId,
             UserId voterId,
             VoteType voteType,
             String reason,
             String voterWalletAddress,
-            BigDecimal votingPower,
             String networkType) {
         
         Proposal proposal = proposalRepository.findById(proposalId)
@@ -128,64 +122,39 @@ public class GovernanceApplicationService {
             throw new IllegalStateException("User has already voted on this proposal");
         }
         
-        // 1. 투표자 토큰 잔액 확인
+        // 1. 투표자 토큰 잔액 확인 (스냅샷용)
         NetworkType networkTypeEnum = determineNetworkType(voterWalletAddress);
         TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
             voterId, voterWalletAddress, networkTypeEnum, "default-contract", "TOKEN");
-        if (tokenAccount.getAvailableBalance().compareTo(votingPower) < 0) {
-            throw new IllegalStateException("투표에 필요한 토큰이 부족합니다. 필요: " + votingPower + ", 보유: " + tokenAccount.getAvailableBalance());
+        
+        // 2. 현재 토큰 잔액을 투표권으로 사용 (스냅샷 방식)
+        BigDecimal votingPower = tokenAccount.getAvailableBalance();
+        if (votingPower.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("투표에 필요한 토큰이 없습니다. 현재 잔액: " + votingPower);
         }
         
-        // 2. 실제 블록체인 네트워크에 투표 트랜잭션 생성 및 브로드캐스트
-        // 2-1. 투표용 TransactionBody 생성 (통합된 메서드 사용)
-        TransactionRequest.VoteData voteData = TransactionRequest.VoteData.builder()
-            .proposalId(proposalId.getValue().toString())
-            .voteType(voteType.name())
-            .votingPower(votingPower)
-            .reason(reason)
-            .build();
-        TransactionBody voteTxBody = walletApplicationService.createTransactionBody(
-            voterWalletAddress,           // fromAddress
-            null,                         // toAddress (투표에는 불필요)
-            null,                         // amount (투표에는 불필요)
-            null,                         // tokenAddress (투표에는 불필요)
-            voteData,                     // 투표 고유 데이터
-            TransactionRequest.TransactionType.PROPOSAL_VOTE, // transactionType
-            NetworkType.valueOf(networkType.toUpperCase()) // networkType
-        );
-        
-        // 2-2. TransactionBody 서명하여 signedRawTransaction 반환
-        byte[] signedRawTransaction = walletApplicationService.signTransactionBody(voteTxBody, voterWalletAddress);
-        
-        // 2-3. signedRawTransaction 브로드캐스트
-        String transactionSignature = walletApplicationService.broadcastSignedTransaction(signedRawTransaction, networkType);
-        
-        // 3. 토큰 스테이킹 (투표권으로 사용) - 실제 블록체인에서 이미 처리됨
-        tokenAccount.stakeTokens(votingPower);
-        // tokenAccountRepository.save(tokenAccount); // TokenApplicationService에서 처리됨
-        
-        // 4. 투표 기록 생성
+        // 3. 투표 기록 생성 (토큰 소각 없음)
         Vote vote = new Vote(proposalId, voterId, voteType, votingPower.longValue(), reason);
         vote = voteRepository.save(vote);
         
-        // 5. 제안서에 투표 추가
+        // 4. 제안서에 투표 추가
         proposal.addVote(voteType, votingPower.longValue());
         proposalRepository.save(proposal);
         
-        // 6. 블록체인 트랜잭션 기록 (실제 블록체인 트랜잭션 해시 저장)
+        // 5. 투표 트랜잭션 기록 (스냅샷 방식이므로 실제 블록체인 트랜잭션 없음)
         Transaction transaction = new Transaction(
             tokenAccount.getUserId(),
-            BlockchainTransactionType.TOKEN_STAKE,
+            BlockchainTransactionType.PROPOSAL_VOTE,
             NetworkType.valueOf(networkType.toUpperCase()),
             votingPower,
             voterWalletAddress,
-            null, // STAKE는 toAddress 없음
-            "투표: " + proposal.getTitle() + " - " + voteType.name()
+            null,
+            "투표 (스냅샷): " + proposal.getTitle() + " - " + voteType.name() + " (투표권: " + votingPower + ")"
         );
-        transaction.confirm(transactionSignature); // 실제 블록체인 트랜잭션 해시
+        transaction.confirm("SNAPSHOT_VOTE_" + vote.getId().getValue()); // 스냅샷 투표는 가상 해시
         transactionRepository.save(transaction);
         
-        return VoteDto.from(vote, transactionSignature, voterWalletAddress);
+        return VoteDto.from(vote, "SNAPSHOT_VOTE_" + vote.getId().getValue(), voterWalletAddress);
     }
     
     // ===== 조회 메서드들 =====
@@ -215,20 +184,11 @@ public class GovernanceApplicationService {
         return voteRepository.findByVoterId(voterId);
     }
     
-    @Transactional(readOnly = true)
-    public Optional<Vote> getVoteByProposalAndVoter(ProposalId proposalId, UserId voterId) {
-        return voteRepository.findByProposalIdAndVoterId(proposalId, voterId);
-    }
-    
 
-
-    // ===== 토큰 관련 메서드들 =====
-    
-    /**
-     * 지갑 주소로 네트워크 타입 결정
-     */
+    // ===== 유틸리티 메서드들 =====
     private NetworkType determineNetworkType(String walletAddress) {
-        if (walletAddress.startsWith("0x")) {
+        // 간단한 주소 길이로 네트워크 타입 판단 (실제로는 더 정교한 검증 필요)
+        if (walletAddress.startsWith("0x") && walletAddress.length() == 42) {
             return NetworkType.ETHEREUM;
         } else if (walletAddress.length() == 44) {
             return NetworkType.SOLANA;
@@ -236,31 +196,14 @@ public class GovernanceApplicationService {
             throw new IllegalArgumentException("Unsupported wallet address format: " + walletAddress);
         }
     }
-    
-    /**
-     * 투표권 계산 (스테이킹된 토큰 기반)
-     */
-    private long calculateVotingPower(UserId userId) {
-        return tokenApplicationService.calculateVotingPower(userId);
-    }
-    
-    // ===== 조회 메서드들 =====
-    
-    @Transactional(readOnly = true)
-    public List<Transaction> getTransactionHistory(UserId userId) {
-        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
-    }
-    
 
-    
-    // 스케줄러: 만료된 투표 기간의 제안서들을 자동으로 종료
     @Scheduled(fixedRate = 60000) // 1분마다 실행
     public void processExpiredProposals() {
+        List<Proposal> activeProposals = proposalRepository.findByStatus(ProposalStatus.VOTING);
         LocalDateTime now = LocalDateTime.now();
-        List<Proposal> expiredProposals = proposalRepository.findByVotingPeriodEndBefore(now);
         
-        for (Proposal proposal : expiredProposals) {
-            if (proposal.isVotingActive()) {
+        for (Proposal proposal : activeProposals) {
+            if (proposal.getVotingPeriod().getEndDate().isBefore(now)) {
                 proposal.endVoting();
                 proposalRepository.save(proposal);
             }

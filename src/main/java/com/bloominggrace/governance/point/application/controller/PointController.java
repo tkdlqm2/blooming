@@ -25,7 +25,7 @@ public class PointController {
     private final PointManagementService pointManagementService;
     private final JwtService jwtService;
 
-    // 무료 포인트 수령
+    // 무료 포인트 수령 (포인트 적립으로 통합)
     @PostMapping("/receive-free")
     public ResponseEntity<ReceiveFreePointsResponse> receiveFreePoints(
             @RequestBody ReceiveFreePointsRequest request,
@@ -37,7 +37,8 @@ public class PointController {
             log.info("무료 포인트 수령 요청: userId={}, amount={}", userId, request.getAmount());
             
             PointAmount amount = PointAmount.of(request.getAmount());
-            pointManagementService.receiveFreePoints(userId, amount);
+            // earnPoints 메서드 사용하여 "무료 포인트 수령" 이유로 적립
+            pointManagementService.earnPoints(userId, amount, "무료 포인트 수령");
             
             // 잔액 조회
             PointManagementService.PointBalance balance = pointManagementService.getPointBalance(userId);

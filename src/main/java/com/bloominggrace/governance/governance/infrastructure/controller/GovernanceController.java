@@ -56,13 +56,12 @@ public class GovernanceController {
         UserId voterIdObj = new UserId(request.getVoterId());
         VoteType voteTypeEnum = request.getVoteType();
         
-        VoteDto voteDto = governanceService.voteWithTransaction(
+        VoteDto voteDto = governanceService.voteWithSnapshot(
             proposalIdObj, 
             voterIdObj, 
             voteTypeEnum, 
             request.getReason(),
             request.getVoterWalletAddress(),
-            request.getVotingPower().getAmount(),
             request.getNetworkType().name()
         );
         

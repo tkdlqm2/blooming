@@ -18,6 +18,9 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
         // 트랜잭션 데이터 생성
         String data = createTransactionData(request);
         
+        // nonce 값 결정 (TransactionRequest에서 가져오거나 기본값 사용)
+        long nonce = request.getNonce() != null ? request.getNonce().longValue() : System.currentTimeMillis();
+        
         // TransactionBody 생성 (타입 캐스팅)
         @SuppressWarnings("unchecked")
         TransactionBody<T> transactionBody = (TransactionBody<T>) new TransactionBody<>(
@@ -26,7 +29,8 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
             request.getToAddress(),
             data,
             request.getNetworkType(),
-            ethereumData
+            ethereumData,
+            nonce // nonce 전달
         );
         
         return transactionBody;
@@ -45,56 +49,69 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
         BigInteger gasPrice = getGasPrice(request);
         BigInteger gasLimit = getGasLimit(request);
         BigInteger value = getValue(request);
+        BigInteger nonce = request.getNonce() != null ? request.getNonce() : BigInteger.ZERO;
+        
+        // TOKEN_TRANSFER의 경우 토큰 컨트랙트 주소를 toAddress로 설정
+        String toAddress = request.getToAddress();
+        String contractAddress = null;
+        String data = null;
+        
+        if (request.getType() == TransactionRequest.TransactionType.TOKEN_TRANSFER) {
+            // ERC20 전송의 경우 toAddress는 토큰 컨트랙트 주소
+            toAddress = request.getTokenAddress();
+            contractAddress = request.getTokenAddress();
+            // ERC20 transfer 함수 호출을 위한 실제 데이터 생성
+            BigInteger amountWei = request.getAmount().multiply(java.math.BigDecimal.valueOf(1e18)).toBigInteger();
+            data = EthereumTransactionData.createERC20TransferData(request.getToAddress(), amountWei);
+        }
         
         return new EthereumTransactionData(
             gasPrice,
             gasLimit,
             value,
-            request.getToAddress()
+            toAddress,
+            contractAddress,
+            data,
+            nonce
         );
     }
     
     /**
-     * 트랜잭션 타입에 따른 가스 가격 계산
+     * 트랜잭션 타입에 따른 가스 가격 계산 (현재 설정의 5배로 조정)
      */
     private BigInteger getGasPrice(TransactionRequest request) {
         // 실제 구현에서는 Ethereum RPC를 통해 현재 가스 가격을 가져와야 함
         switch (request.getType()) {
             case PROPOSAL_CREATE:
             case PROPOSAL_VOTE:
-                return BigInteger.valueOf(25000000000L); // 25 Gwei (스마트 컨트랙트 호출)
+                return BigInteger.valueOf(125000000000L); // 125 Gwei (스마트 컨트랙트 호출) - 5배 증가
             case TOKEN_MINT:
             case TOKEN_BURN:
-            case TOKEN_STAKE:
-            case TOKEN_UNSTAKE:
-                return BigInteger.valueOf(22000000000L); // 22 Gwei (토큰 작업)
+                return BigInteger.valueOf(110000000000L); // 110 Gwei (토큰 작업) - 5배 증가
             case TOKEN_TRANSFER:
-                return BigInteger.valueOf(20000000000L); // 20 Gwei (기본)
+                return BigInteger.valueOf(100000000000L); // 100 Gwei (기본) - 5배 증가
             default:
-                return BigInteger.valueOf(20000000000L);
+                return BigInteger.valueOf(100000000000L); // 100 Gwei - 5배 증가
         }
     }
     
     /**
-     * 트랜잭션 타입에 따른 가스 한도 계산
+     * 트랜잭션 타입에 따른 가스 한도 계산 (5배 증가)
      */
     private BigInteger getGasLimit(TransactionRequest request) {
         switch (request.getType()) {
             case PROPOSAL_CREATE:
-                return BigInteger.valueOf(300000L); // 정책 제안 생성
+                return BigInteger.valueOf(1500000L); // 정책 제안 생성 - 5배 증가
             case PROPOSAL_VOTE:
-                return BigInteger.valueOf(100000L); // 투표
+                return BigInteger.valueOf(500000L); // 투표 - 5배 증가
             case TOKEN_MINT:
-                return BigInteger.valueOf(200000L); // 토큰 민팅
+                return BigInteger.valueOf(1000000L); // 토큰 민팅 - 5배 증가
             case TOKEN_BURN:
-                return BigInteger.valueOf(150000L); // 토큰 소각
-            case TOKEN_STAKE:
-            case TOKEN_UNSTAKE:
-                return BigInteger.valueOf(180000L); // 토큰 스테이킹/언스테이킹
+                return BigInteger.valueOf(750000L); // 토큰 소각 - 5배 증가
             case TOKEN_TRANSFER:
-                return BigInteger.valueOf(65000L); // ERC-20 토큰 전송
+                return BigInteger.valueOf(325000L); // ERC-20 토큰 전송 - 5배 증가
             default:
-                return BigInteger.valueOf(21000L); // 기본 ETH 전송
+                return BigInteger.valueOf(105000L); // 기본 ETH 전송 - 5배 증가
         }
     }
     
@@ -124,9 +141,17 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
                     voteData.getProposalId(), voteData.getVoteType(), voteData.getVotingPower().toString(), 
                     voteData.getReason() != null ? voteData.getReason() : "");
             }
-            case TOKEN_TRANSFER:
-                return String.format("{\"tokenAddress\":\"%s\",\"amount\":\"%s\",\"type\":\"TOKEN_TRANSFER\"}", 
-                    request.getTokenAddress(), request.getAmount().toString());
+            case TOKEN_TRANSFER: {
+                // ERC20 transfer 함수 호출을 위한 실제 컨트랙트 데이터 생성
+                String toAddress = request.getToAddress();
+                String amount = request.getAmount().toString();
+                String tokenAddress = request.getTokenAddress();
+                
+                // ERC20 transfer 함수 시그니처: transfer(address,uint256)
+                // 실제 구현에서는 EthereumTransactionData.createERC20TransferData 사용
+                return String.format("{\"method\":\"transfer\",\"toAddress\":\"%s\",\"amount\":\"%s\",\"tokenAddress\":\"%s\",\"type\":\"ERC20_TRANSFER\"}", 
+                    toAddress, amount, tokenAddress);
+            }
             case TOKEN_MINT: {
                 TransactionRequest.TokenMintData mintData = (TransactionRequest.TokenMintData) request.getTransactionData();
                 return String.format("{\"amount\":\"%s\",\"description\":\"%s\",\"type\":\"TOKEN_MINT\"}", 
@@ -137,10 +162,6 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
                 return String.format("{\"amount\":\"%s\",\"description\":\"%s\",\"type\":\"TOKEN_BURN\"}", 
                     request.getAmount().toString(), burnData.getDescription() != null ? burnData.getDescription() : "");
             }
-            case TOKEN_STAKE:
-                return String.format("{\"amount\":\"%s\",\"type\":\"TOKEN_STAKE\"}", request.getAmount().toString());
-            case TOKEN_UNSTAKE:
-                return String.format("{\"amount\":\"%s\",\"type\":\"TOKEN_UNSTAKE\"}", request.getAmount().toString());
             default:
                 return "{}";
         }
@@ -159,10 +180,6 @@ public class EthereumTransactionBodyFactory implements TransactionBodyFactory {
                 return TransactionBody.TransactionType.TOKEN_MINT;
             case TOKEN_BURN:
                 return TransactionBody.TransactionType.TOKEN_BURN;
-            case TOKEN_STAKE:
-                return TransactionBody.TransactionType.TOKEN_STAKE;
-            case TOKEN_UNSTAKE:
-                return TransactionBody.TransactionType.TOKEN_UNSTAKE;
             case TOKEN_TRANSFER:
                 return TransactionBody.TransactionType.TOKEN_TRANSFER;
             default:

@@ -1,220 +1,298 @@
 package com.bloominggrace.governance.exchange.application.service;
 
-import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.exchange.domain.model.ExchangeRequest;
 import com.bloominggrace.governance.exchange.domain.model.ExchangeRequestId;
 import com.bloominggrace.governance.exchange.domain.model.ExchangeStatus;
 import com.bloominggrace.governance.exchange.infrastructure.repository.ExchangeRequestRepository;
 import com.bloominggrace.governance.point.application.service.PointManagementService;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
-import com.bloominggrace.governance.token.domain.model.TokenAccount;
-import com.bloominggrace.governance.token.domain.model.TokenAmount;
-import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountRepository;
-import com.bloominggrace.governance.shared.domain.model.BlockchainTransactionType;
-import com.bloominggrace.governance.shared.domain.model.Transaction;
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.TransactionRequest;
-import com.bloominggrace.governance.shared.infrastructure.repository.TransactionRepository;
-import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
+import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
+import com.bloominggrace.governance.token.application.service.TokenAccountApplicationService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.wallet.domain.model.Wallet;
+import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
+@Slf4j
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class ExchangeApplicationService {
     
     private final ExchangeRequestRepository exchangeRequestRepository;
     private final PointManagementService pointManagementService;
-    private final TokenAccountRepository tokenAccountRepository;
-    private final TransactionRepository transactionRepository;
-    private final WalletApplicationService walletApplicationService;
+    private final TokenAccountApplicationService tokenAccountApplicationService;
+    private final TransactionOrchestrator transactionOrchestrator;
     
-    // 포인트와 토큰의 교환 비율 (1 포인트 = 0.01 토큰)
+    // 포인트 → 토큰 교환 비율 (1 포인트 = 0.01 토큰)
     private static final BigDecimal EXCHANGE_RATE = new BigDecimal("0.01");
     
     /**
-     * 포인트를 토큰으로 교환 요청
+     * 교환 요청을 조회합니다.
      */
-    public ExchangeRequestId requestExchange(UUID userId, PointAmount pointAmount, String walletAddress) {
-        // 포인트 잔액 확인 (PointManagementService에는 hasSufficientPoints 메서드가 없으므로 직접 확인)
-        PointManagementService.PointBalance balance = pointManagementService.getPointBalance(userId);
-        if (balance.getAvailableBalance().getAmount().compareTo(pointAmount.getAmount()) < 0) {
-            throw new IllegalStateException("포인트가 부족합니다");
-        }
-        
-        // 교환 요청 생성
-        ExchangeRequest exchangeRequest = new ExchangeRequest(userId, pointAmount, walletAddress);
-        exchangeRequest = exchangeRequestRepository.save(exchangeRequest);
-        
-        return exchangeRequest.getId();
+    public ExchangeRequest getExchangeRequest(ExchangeRequestId exchangeRequestId) {
+        return exchangeRequestRepository.findById(exchangeRequestId)
+            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found: " + exchangeRequestId.getValue()));
     }
     
     /**
-     * 교환 처리 (포인트 차감 및 토큰 발행)
+     * 교환 요청을 생성합니다.
      */
-    public void processExchange(ExchangeRequestId exchangeRequestId) {
-        ExchangeRequest exchangeRequest = exchangeRequestRepository.findById(exchangeRequestId)
-            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found"));
+    @Transactional
+    public ExchangeRequest createExchangeRequest(UserId userId, BigDecimal pointAmount, String walletAddress) {
+        log.info("Creating exchange request - UserId: {}, PointAmount: {}, WalletAddress: {}", 
+            userId, pointAmount, walletAddress);
         
-        if (exchangeRequest.getStatus() != ExchangeStatus.REQUESTED) {
-            throw new IllegalStateException("Exchange request already processed");
+        // 1. 포인트 잔액 확인
+        var pointBalance = pointManagementService.getPointBalance(userId.getValue());
+        if (pointBalance.getAvailableBalance().getAmount().compareTo(pointAmount) < 0) {
+            throw new IllegalArgumentException("Insufficient point balance. Available: " + 
+                pointBalance.getAvailableBalance().getAmount() + ", Required: " + pointAmount);
         }
         
-        // 포인트 차감
-        pointManagementService.freezePoints(exchangeRequest.getUserId(), exchangeRequest.getPointAmount(), exchangeRequest.getId().toString());
+        // 2. 지갑 주소 유효성 검증
+        if (walletAddress == null || walletAddress.trim().isEmpty()) {
+            throw new IllegalArgumentException("Wallet address is required");
+        }
         
-        // 교환 요청 상태 업데이트
+        // 3. 교환 요청 생성
+        ExchangeRequest exchangeRequest = new ExchangeRequest(
+            userId.getValue(),
+            PointAmount.of(pointAmount),
+            walletAddress
+        );
+        
+        // 4. 교환 요청 저장
+        ExchangeRequest savedRequest = exchangeRequestRepository.save(exchangeRequest);
+        
+        log.info("Exchange request created successfully - RequestId: {}", savedRequest.getId());
+        return savedRequest;
+    }
+    
+    /**
+     * 교환 요청을 처리합니다.
+     */
+    @Transactional
+    public void processExchangeRequest(ExchangeRequestId exchangeRequestId) {
+        log.info("Processing exchange request - RequestId: {}", exchangeRequestId);
+        
+        ExchangeRequest exchangeRequest = validateAndGetExchangeRequest(exchangeRequestId);
+        
+        try {
+            // 1. 교환 처리 시작
+            startExchangeProcessing(exchangeRequest);
+            
+            // 2. 사용자의 포인트 동결
+            freezeUserPoints(exchangeRequest, exchangeRequestId);
+            
+            // 3. 토큰 전송 실행
+            String transactionHash = executeTokenTransfer(exchangeRequest);
+            
+            // 4. 토큰 계정 생성 또는 업데이트
+            createOrUpdateTokenAccount(exchangeRequest);
+            
+            // 5. 교환 완료 처리
+            completeExchangeRequest(exchangeRequest, transactionHash);
+            
+            log.info("Exchange request processed successfully - RequestId: {}, TransactionHash: {}", 
+                exchangeRequestId, transactionHash);
+            
+        } catch (Exception e) {
+            log.error("Error processing exchange request - RequestId: {}", exchangeRequestId, e);
+            handleExchangeFailure(exchangeRequest, exchangeRequestId, e);
+        }
+    }
+
+
+    /**
+     * 지갑 주소로부터 네트워크 타입을 결정합니다.
+     */
+    private NetworkType determineNetworkType(String walletAddress) {
+        if (walletAddress.startsWith("0x")) {
+            return NetworkType.ETHEREUM;
+        } else if (walletAddress.length() == 44) {
+            return NetworkType.SOLANA;
+        } else {
+            // 기본값으로 Ethereum 사용
+            log.warn("Unable to determine network type from wallet address: {}. Using ETHEREUM as default.", walletAddress);
+            return NetworkType.ETHEREUM;
+        }
+    }
+
+    /**
+     * 네트워크 타입에 따른 토큰 컨트랙트 주소를 반환합니다.
+     */
+    private String getTokenContractAddress(NetworkType networkType) {
+        switch (networkType) {
+            case ETHEREUM:
+                return BlockchainMetadata.Ethereum.ERC20_CONTRACT_ADDRESS;
+            case SOLANA:
+                return BlockchainMetadata.Solana.SPL_TOKEN_MINT_ADDRESS;
+            default:
+                throw new IllegalArgumentException("Unsupported network type: " + networkType);
+        }
+    }
+
+    /**
+     * 교환 요청을 검증하고 조회합니다.
+     */
+    private ExchangeRequest validateAndGetExchangeRequest(ExchangeRequestId exchangeRequestId) {
+        ExchangeRequest exchangeRequest = exchangeRequestRepository.findById(exchangeRequestId)
+            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found: " + exchangeRequestId));
+        
+        if (exchangeRequest.getStatus() != ExchangeStatus.REQUESTED) {
+            throw new IllegalStateException("Exchange request is not in REQUESTED status: " + exchangeRequestId);
+        }
+        
+        return exchangeRequest;
+    }
+    
+    /**
+     * 교환 처리 시작
+     */
+    private void startExchangeProcessing(ExchangeRequest exchangeRequest) {
         exchangeRequest.process();
         exchangeRequestRepository.save(exchangeRequest);
     }
     
     /**
-     * 교환 완료 (토큰 발행)
+     * 사용자 포인트 동결
      */
-    public void completeExchange(ExchangeRequestId exchangeRequestId) {
-        ExchangeRequest exchangeRequest = exchangeRequestRepository.findById(exchangeRequestId)
-            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found"));
+    private void freezeUserPoints(ExchangeRequest exchangeRequest, ExchangeRequestId exchangeRequestId) {
+        pointManagementService.freezePoints(
+            exchangeRequest.getUserId(),
+            exchangeRequest.getPointAmount(),
+            exchangeRequestId.getValue().toString()
+        );
+    }
+    
+    /**
+     * 토큰 전송 실행
+     */
+    private String executeTokenTransfer(ExchangeRequest exchangeRequest) {
+        NetworkType networkType = determineNetworkType(exchangeRequest.getWalletAddress());
+        AdminWalletService.AdminWalletInfo adminWallet = getAdminWallet(networkType);
+        String tokenContract = getTokenContractAddress(networkType);
+        BigDecimal tokenAmount = calculateTokenAmount(exchangeRequest);
         
-        if (exchangeRequest.getStatus() != ExchangeStatus.PROCESSING) {
-            throw new IllegalStateException("Exchange request not processed yet");
+        log.info("Creating token transfer transaction for exchange - From: {} To: {} Amount: {} Network: {} Contract: {}", 
+            adminWallet.getWalletAddress(), exchangeRequest.getWalletAddress(), tokenAmount, networkType, tokenContract);
+        
+        String transactionHash = transactionOrchestrator.executeTransfer(
+            adminWallet.getWalletAddress(),
+            exchangeRequest.getWalletAddress(),
+            networkType,
+            tokenAmount,
+            tokenContract
+        ).getTransactionHash();
+        
+        if (transactionHash == null || transactionHash.isEmpty()) {
+            throw new RuntimeException("Token transfer failed: No transaction hash returned");
         }
         
-        if (exchangeRequest.getStatus() == ExchangeStatus.COMPLETED) {
-            throw new IllegalStateException("Exchange request already completed");
+        return transactionHash;
+    }
+    
+    /**
+     * Admin 지갑 정보 조회
+     */
+    private AdminWalletService.AdminWalletInfo getAdminWallet(NetworkType networkType) {
+        AdminWalletService.AdminWalletInfo adminWallet = AdminWalletService.getAdminWallet(networkType);
+        if (adminWallet == null) {
+            throw new RuntimeException("Admin wallet not found for network: " + networkType);
         }
-        
-        // 블록체인 네트워크에 토큰 발행 트랜잭션 생성 및 전송
-        String blockchainTransactionSignature = mintTokensOnBlockchain(exchangeRequest);
-        
-        // 토큰 발행 (로컬 DB)
-        mintTokensForExchange(exchangeRequest);
-        
-        // 교환 요청 완료 처리 (블록체인 트랜잭션 서명 포함)
-        exchangeRequest.complete(blockchainTransactionSignature);
+        return adminWallet;
+    }
+    
+    /**
+     * 토큰 양 계산
+     */
+    private BigDecimal calculateTokenAmount(ExchangeRequest exchangeRequest) {
+        return exchangeRequest.getPointAmount().getAmount().multiply(EXCHANGE_RATE);
+    }
+    
+    /**
+     * 토큰 계정 생성 또는 업데이트
+     */
+    private void createOrUpdateTokenAccount(ExchangeRequest exchangeRequest) {
+        NetworkType networkType = determineNetworkType(exchangeRequest.getWalletAddress());
+        tokenAccountApplicationService.findOrCreateDefaultTokenAccount(
+            exchangeRequest.getUserId().toString(),
+            exchangeRequest.getWalletAddress(),
+            networkType
+        );
+    }
+    
+    /**
+     * 교환 완료 처리
+     */
+    private void completeExchangeRequest(ExchangeRequest exchangeRequest, String transactionHash) {
+        exchangeRequest.complete(transactionHash);
         exchangeRequestRepository.save(exchangeRequest);
     }
     
     /**
-     * 교환 취소
+     * 교환 실패 처리
      */
-    public void cancelExchange(ExchangeRequestId exchangeRequestId) {
+    private void handleExchangeFailure(ExchangeRequest exchangeRequest, ExchangeRequestId exchangeRequestId, Exception e) {
+        // 교환 실패 처리
+        exchangeRequest.fail();
+        exchangeRequestRepository.save(exchangeRequest);
+        
+        // 포인트 해제
+        unfreezeUserPoints(exchangeRequest, exchangeRequestId);
+        
+        throw new RuntimeException("Failed to process exchange request: " + e.getMessage(), e);
+    }
+    
+    /**
+     * 사용자 포인트 해제
+     */
+    private void unfreezeUserPoints(ExchangeRequest exchangeRequest, ExchangeRequestId exchangeRequestId) {
+        pointManagementService.unfreezePoints(
+            exchangeRequest.getUserId(),
+            exchangeRequest.getPointAmount(),
+            exchangeRequestId.getValue().toString()
+        );
+    }
+    
+    /**
+     * 취소를 위한 교환 요청을 검증하고 조회합니다.
+     */
+    private ExchangeRequest validateAndGetExchangeRequestForCancellation(ExchangeRequestId exchangeRequestId) {
         ExchangeRequest exchangeRequest = exchangeRequestRepository.findById(exchangeRequestId)
-            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found"));
+            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found: " + exchangeRequestId));
         
         if (exchangeRequest.getStatus() == ExchangeStatus.COMPLETED) {
-            throw new IllegalStateException("Cannot cancel completed exchange");
+            throw new IllegalStateException("Exchange request cannot be cancelled: " + exchangeRequestId);
         }
         
-        // 포인트 해제 (차감된 포인트 복원)
+        return exchangeRequest;
+    }
+    
+    /**
+     * 처리 중인 경우 포인트 해제
+     */
+    private void unfreezePointsIfProcessing(ExchangeRequest exchangeRequest, ExchangeRequestId exchangeRequestId) {
         if (exchangeRequest.getStatus() == ExchangeStatus.PROCESSING) {
-            pointManagementService.unfreezePoints(exchangeRequest.getUserId(), exchangeRequest.getPointAmount(), exchangeRequest.getId().toString());
+            pointManagementService.unfreezePoints(
+                exchangeRequest.getUserId(),
+                exchangeRequest.getPointAmount(),
+                exchangeRequestId.getValue().toString()
+            );
         }
-        
-        // 교환 요청 취소
+    }
+    
+    /**
+     * 교환 요청 취소 처리
+     */
+    private void cancelExchangeRequest(ExchangeRequest exchangeRequest) {
         exchangeRequest.cancel();
         exchangeRequestRepository.save(exchangeRequest);
-    }
-    
-    /**
-     * 교환을 위한 토큰 발행
-     */
-    private void mintTokensForExchange(ExchangeRequest exchangeRequest) {
-        // 포인트를 토큰으로 변환 (1 포인트 = 0.01 토큰)
-        BigDecimal tokenAmount = exchangeRequest.getPointAmount().getAmount()
-            .multiply(EXCHANGE_RATE);
-        
-        // 토큰 계정 생성 또는 조회
-        TokenAccount tokenAccount = getOrCreateTokenAccount(new UserId(exchangeRequest.getUserId()), exchangeRequest.getWalletAddress());
-        
-        // 토큰 발행
-        tokenAccount.mintTokens(tokenAmount, "포인트 교환: " + exchangeRequest.getPointAmount().getAmount() + " 포인트");
-        tokenAccountRepository.save(tokenAccount);
-        
-        // 블록체인 트랜잭션 기록
-        Transaction transaction = new Transaction(
-            new UserId(exchangeRequest.getUserId()),
-            BlockchainTransactionType.TOKEN_MINT,
-            determineNetworkType(exchangeRequest.getWalletAddress()),
-            tokenAmount,
-            exchangeRequest.getWalletAddress(),
-            null, // MINT는 toAddress 없음
-            "포인트 교환: " + exchangeRequest.getPointAmount().getAmount() + " 포인트"
-        );
-        transactionRepository.save(transaction);
-    }
-    
-    /**
-     * 블록체인 네트워크에 토큰 발행 트랜잭션 생성 및 전송
-     */
-    private String mintTokensOnBlockchain(ExchangeRequest exchangeRequest) {
-        // 포인트를 토큰으로 변환 (1 포인트 = 0.01 토큰)
-        BigDecimal tokenAmount = exchangeRequest.getPointAmount().getAmount()
-            .multiply(EXCHANGE_RATE);
-        
-        // 네트워크 타입 결정
-        NetworkType networkType = determineNetworkType(exchangeRequest.getWalletAddress());
-        
-        // 새로운 통합 메서드를 사용하여 토큰 민팅 트랜잭션 생성
-        TransactionRequest.TokenMintData mintData = new TransactionRequest.TokenMintData(
-            "포인트 교환: " + exchangeRequest.getPointAmount().getAmount() + " 포인트"
-        );
-        TransactionBody transactionBody = walletApplicationService.createTransactionBody(
-            exchangeRequest.getWalletAddress(), null, tokenAmount, null, mintData, 
-            TransactionRequest.TransactionType.TOKEN_MINT, networkType
-        );
-        
-        // 트랜잭션 서명 및 브로드캐스트
-        byte[] signedTransaction = walletApplicationService.signTransactionBody(transactionBody, exchangeRequest.getWalletAddress());
-        return walletApplicationService.broadcastSignedTransaction(signedTransaction, networkType.name());
-    }
-    
-    /**
-     * 토큰 계정 생성 또는 조회
-     */
-    private TokenAccount getOrCreateTokenAccount(UserId userId, String walletAddress) {
-        return tokenAccountRepository.findByUserId(userId)
-            .orElseGet(() -> {
-                // Wallet 객체를 찾아야 함
-                Wallet wallet = walletApplicationService.getWalletByAddress(walletAddress)
-                    .orElseThrow(() -> new IllegalStateException("Wallet not found: " + walletAddress));
-                
-                NetworkType networkType = determineNetworkType(walletAddress);
-                TokenAccount newAccount = new TokenAccount(
-                    wallet, 
-                    userId, 
-                    networkType,
-                    "default-contract", // 기본값, 필요시 파라미터로 받아야 함
-                    "TOKEN" // 기본값, 필요시 파라미터로 받아야 함
-                );
-                return tokenAccountRepository.save(newAccount);
-            });
-    }
-    
-    /**
-     * 지갑 주소로 네트워크 타입 결정
-     */
-    private NetworkType determineNetworkType(String walletAddress) {
-        return com.bloominggrace.governance.shared.util.AddressUtils.guessNetworkType(walletAddress);
-    }
-    
-    // ===== 조회 메서드들 =====
-    
-    @Transactional(readOnly = true)
-    public List<ExchangeRequest> getExchangeRequests(UUID userId) {
-        return exchangeRequestRepository.findByUserId(userId);
-    }
-    
-    @Transactional(readOnly = true)
-    public Optional<ExchangeRequest> getExchangeRequest(ExchangeRequestId exchangeRequestId) {
-        return exchangeRequestRepository.findById(exchangeRequestId);
     }
 } 

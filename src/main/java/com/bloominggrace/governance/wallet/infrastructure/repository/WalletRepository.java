@@ -4,6 +4,8 @@ import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,7 +17,13 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     List<Wallet> findByUserId(UUID userId);
     List<Wallet> findByUserId(UserId userId);
     List<Wallet> findByNetworkType(NetworkType networkType);
+    List<Wallet> findByNetworkTypeAndActiveTrue(NetworkType networkType);
     Optional<Wallet> findByUserIdAndNetworkType(UserId userId, NetworkType networkType);
+    
+    // User 관계를 통해 조회하는 메서드 추가
+    @Query("SELECT w FROM Wallet w WHERE w.user.id = :userId AND w.networkType = :networkType")
+    Optional<Wallet> findByUser_IdAndNetworkType(@Param("userId") UUID userId, @Param("networkType") NetworkType networkType);
+    
     boolean existsByWalletAddress(String walletAddress);
     Optional<Wallet> findByWalletAddress(String walletAddress);
 } 

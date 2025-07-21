@@ -3,10 +3,12 @@ package com.bloominggrace.governance.wallet.application.service;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.infrastructure.repository.WalletRepository;
-import com.bloominggrace.governance.wallet.infrastructure.service.ethereum.EthereumWalletService;
+import com.bloominggrace.governance.wallet.infrastructure.service.ethereum.EthereumWallet;
 import com.bloominggrace.governance.wallet.infrastructure.service.solana.SolanaWalletService;
 import com.bloominggrace.governance.shared.domain.service.EncryptionService;
 import com.bloominggrace.governance.user.infrastructure.repository.UserRepository;
+import org.springframework.context.ApplicationContext;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Component
 public class WalletServiceFactory {
+    private final ApplicationContext applicationContext;
     private final WalletRepository walletRepository;
     private final EncryptionService encryptionService;
     private final UserRepository userRepository;
@@ -31,9 +34,9 @@ public class WalletServiceFactory {
     public WalletService getWalletService(NetworkType networkType) {
         switch (networkType) {
             case ETHEREUM:
-                return new EthereumWalletService(walletRepository, encryptionService, userRepository);
+                return new EthereumWallet(applicationContext, walletRepository, encryptionService, userRepository);
             case SOLANA:
-                return new SolanaWalletService(walletRepository, encryptionService, userRepository);
+                return new SolanaWalletService(applicationContext, walletRepository, encryptionService, userRepository);
             default:
                 throw new IllegalArgumentException("Unsupported network type: " + networkType);
         }
