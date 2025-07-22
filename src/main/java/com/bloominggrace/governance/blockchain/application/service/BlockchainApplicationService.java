@@ -141,45 +141,6 @@ public class BlockchainApplicationService {
     }
 
     /**
-     * Admin 지갑의 nonce 캐시를 초기화합니다.
-     */
-    public void resetAdminNonce(NetworkType networkType) {
-        adminWalletService.clearNonceCache(networkType);
-    }
-
-    /**
-     * Admin 지갑의 nonce를 강제로 블록체인에서 다시 로딩합니다.
-     */
-    public String reloadAdminNonce(NetworkType networkType) {
-        BigInteger nonce = adminWalletService.forceReloadAdminWalletNonce(networkType);
-        return nonce.toString();
-    }
-
-    /**
-     * Admin 지갑의 nonce를 0으로 강제 설정합니다 (테스트용).
-     */
-    public String setAdminNonceToZero(NetworkType networkType) {
-        BigInteger nonce = adminWalletService.forceSetAdminWalletNonceToZero(networkType);
-        return nonce.toString();
-    }
-
-    /**
-     * Admin 지갑의 nonce를 자동으로 증가시킵니다.
-     */
-    public String incrementAdminNonce(NetworkType networkType) {
-        BigInteger nonce = adminWalletService.incrementAdminNonce(networkType);
-        return nonce.toString();
-    }
-
-    /**
-     * Admin 지갑의 현재 nonce를 가져옵니다.
-     */
-    public String getCurrentAdminNonce(NetworkType networkType) {
-        BigInteger nonce = adminWalletService.getCurrentAdminNonce(networkType);
-        return nonce.toString();
-    }
-
-    /**
      * 트랜잭션 수수료를 계산합니다.
      */
     public String calculateTransactionFee(String gasPrice, String gasLimit, NetworkType networkType) {

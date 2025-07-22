@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
+import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 
 /**
  * RawTransaction 생성을 위한 인터페이스
@@ -63,5 +64,19 @@ public interface RawTransactionBuilder {
         String reason,
         BigDecimal votingPower,
         String nonce
+    );
+
+    /**
+     * 투표권 위임을 위한 RawTransaction JSON 생성
+     * 
+     * @param delegatorWalletAddress 위임하는 지갑 주소
+     * @param delegateeWalletAddress 위임받는 지갑 주소
+     * @param networkType 네트워크 타입
+     * @return RawTransaction JSON 문자열
+     */
+    String createDelegationRawTransaction(
+        String delegatorWalletAddress,
+        String delegateeWalletAddress,
+        NetworkType networkType
     );
 } 

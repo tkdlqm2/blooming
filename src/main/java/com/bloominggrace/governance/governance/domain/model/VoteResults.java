@@ -2,18 +2,45 @@ package com.bloominggrace.governance.governance.domain.model;
 
 import com.bloominggrace.governance.shared.domain.ValueObject;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
 
+@Embeddable
 public class VoteResults extends ValueObject {
-    private final long totalVotes;
-    private final long yesVotes;
-    private final long noVotes;
-    private final long abstainVotes;
-    private final BigDecimal yesPercentage;
-    private final BigDecimal noPercentage;
-    private final BigDecimal abstainPercentage;
+    @Column(name = "total_votes")
+    private long totalVotes;
+    
+    @Column(name = "yes_votes")
+    private long yesVotes;
+    
+    @Column(name = "no_votes")
+    private long noVotes;
+    
+    @Column(name = "abstain_votes")
+    private long abstainVotes;
+    
+    @Column(name = "yes_percentage", precision = 5, scale = 2)
+    private BigDecimal yesPercentage;
+    
+    @Column(name = "no_percentage", precision = 5, scale = 2)
+    private BigDecimal noPercentage;
+    
+    @Column(name = "abstain_percentage", precision = 5, scale = 2)
+    private BigDecimal abstainPercentage;
+
+    // Hibernate를 위한 기본 생성자
+    protected VoteResults() {
+        this.totalVotes = 0;
+        this.yesVotes = 0;
+        this.noVotes = 0;
+        this.abstainVotes = 0;
+        this.yesPercentage = BigDecimal.ZERO;
+        this.noPercentage = BigDecimal.ZERO;
+        this.abstainPercentage = BigDecimal.ZERO;
+    }
 
     public VoteResults(long totalVotes, long yesVotes, long noVotes, long abstainVotes) {
         if (totalVotes < 0 || yesVotes < 0 || noVotes < 0 || abstainVotes < 0) {

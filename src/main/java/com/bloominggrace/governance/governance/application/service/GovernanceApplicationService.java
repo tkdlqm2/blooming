@@ -5,6 +5,7 @@ import com.bloominggrace.governance.governance.domain.model.*;
 import com.bloominggrace.governance.governance.infrastructure.repository.ProposalRepository;
 import com.bloominggrace.governance.governance.infrastructure.repository.VoteRepository;
 import com.bloominggrace.governance.governance.application.dto.*;
+import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.token.application.service.TokenApplicationService;
@@ -13,6 +14,8 @@ import com.bloominggrace.governance.shared.domain.model.Transaction;
 import com.bloominggrace.governance.shared.infrastructure.repository.TransactionRepository;
 import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
 import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator.TransactionResult;
+import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountJpaRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,6 +37,7 @@ public class GovernanceApplicationService {
     private final TokenApplicationService tokenApplicationService;
     private final TransactionRepository transactionRepository;
     private final TransactionOrchestrator transactionOrchestrator;
+    private final TokenAccountJpaRepository tokenAccountRepository;
     
     // ===== 거버넌스 관련 메서드들 =====
     
@@ -51,53 +55,245 @@ public class GovernanceApplicationService {
             BigDecimal proposalFee,
             String networkType) {
         
-        // 1. 제안자 토큰 잔액 확인
-        NetworkType networkTypeEnum = determineNetworkType(creatorWalletAddress);
-        TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
-            creatorId, creatorWalletAddress, networkTypeEnum, "default-contract", "TOKEN");
-        if (tokenAccount.getAvailableBalance().compareTo(proposalFee) < 0) {
-            throw new IllegalStateException("제안 수수료가 부족합니다. 필요: " + proposalFee + ", 보유: " + tokenAccount.getAvailableBalance());
+        try {
+            // 1. 제안자 토큰 잔액 확인
+            NetworkType networkTypeEnum = determineNetworkType(creatorWalletAddress);
+            TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
+                creatorId, creatorWalletAddress, networkTypeEnum, "default-contract", "TOKEN");
+            
+            // 제안 수수료가 있는 경우 잔액 확인
+            if (proposalFee.compareTo(BigDecimal.ZERO) > 0) {
+                if (tokenAccount.getAvailableBalance().compareTo(proposalFee) < 0) {
+                    throw new IllegalStateException("제안 수수료가 부족합니다. 필요: " + proposalFee + ", 보유: " + tokenAccount.getAvailableBalance());
+                }
+            }
+            
+            // 2. 제안서 생성
+            VotingPeriod votingPeriod = new VotingPeriod(votingStartDate, votingEndDate);
+            Proposal proposal = new Proposal(creatorId, title, description, votingPeriod, requiredQuorum);
+            proposal = proposalRepository.save(proposal);
+
+            // 3. 블록체인에 거버넌스 제안 트랜잭션 실행 (수수료와 관계없이 항상 실행)
+            String transactionHash = null;
+            
+            System.out.println("=== 🔄 executeProposalCreation 호출 중... ===");
+            TransactionResult txResult = transactionOrchestrator.executeProposalCreation(
+                proposal.getId().getValue(),
+                title,
+                description,
+                creatorWalletAddress,
+                networkTypeEnum,
+                proposalFee,
+                votingStartDate,
+                votingEndDate,
+                BigDecimal.valueOf(requiredQuorum)
+            );
+
+            if (!txResult.isSuccess()) {
+                throw new RuntimeException("Failed to create proposal transaction: " + txResult.getErrorMessage());
+            }
+            
+            transactionHash = txResult.getTransactionHash();
+            
+            // 제안 수수료가 있는 경우 토큰 차감
+            if (proposalFee.compareTo(BigDecimal.ZERO) > 0) {
+                tokenAccount.burnTokens(proposalFee, "제안 수수료: " + proposal.getTitle());
+            }
+            
+            // 블록체인 트랜잭션 기록
+            Transaction transaction = new Transaction(
+                tokenAccount.getUserId(),
+                BlockchainTransactionType.PROPOSAL_CREATE,
+                NetworkType.valueOf(networkType.toUpperCase()),
+                proposalFee,
+                creatorWalletAddress,
+                null, // 제안 생성은 toAddress 없음
+                "거버넌스 제안 생성: " + proposal.getTitle()
+            );
+            transaction.confirm(transactionHash);
+            transactionRepository.save(transaction);
+            
+            return ProposalDto.from(proposal, transactionHash, creatorWalletAddress);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
         }
+    }
+    
+    /**
+     * 1단계: 거버넌스 제안 저장 (블록체인 트랜잭션 없이)
+     */
+    public ProposalDto createProposal(
+            UserId creatorId,
+            String title,
+            String description,
+            LocalDateTime votingStartDate,
+            LocalDateTime votingEndDate,
+            long requiredQuorum,
+            String creatorWalletAddress,
+            BigDecimal proposalFee,
+            String networkType) {
         
-        // 2. 제안서 생성
-        VotingPeriod votingPeriod = new VotingPeriod(votingStartDate, votingEndDate);
-        Proposal proposal = new Proposal(creatorId, title, description, votingPeriod, requiredQuorum);
-        proposal = proposalRepository.save(proposal);
-        
-        // 3. TransactionOrchestrator를 통해 트랜잭션 생성 및 브로드캐스트
-        TransactionResult txResult = transactionOrchestrator.executeProposalCreation(
-            proposal.getId().getValue(),
-            title,
-            description,
-            creatorWalletAddress,
-            networkTypeEnum,
-            proposalFee,
-            votingStartDate,
-            votingEndDate,
-            BigDecimal.valueOf(requiredQuorum)
-        );
-        
-        if (!txResult.isSuccess()) {
-            throw new RuntimeException("Failed to create proposal transaction: " + txResult.getErrorMessage());
+        try {
+            // 1. 제안서 생성 및 저장 (토큰 잔액 확인은 2단계에서 수행)
+            VotingPeriod votingPeriod = new VotingPeriod(votingStartDate, votingEndDate);
+            Proposal proposal = new Proposal(creatorId, title, description, votingPeriod, requiredQuorum);
+            proposal = proposalRepository.save(proposal);
+            
+            System.out.println("=== 📝 거버넌스 제안 저장 완료 ===");
+            System.out.println("제안 ID: " + proposal.getId().getValue());
+            System.out.println("제안자 ID: " + proposal.getCreatorId().getValue());
+            System.out.println("제목: " + proposal.getTitle());
+            System.out.println("제안 수수료: " + proposalFee);
+            System.out.println("지갑 주소: " + creatorWalletAddress);
+            System.out.println("네트워크: " + networkType);
+            
+            return ProposalDto.from(proposal, null, creatorWalletAddress);
+            
+        } catch (Exception e) {
+            System.err.println("=== ❌ 거버넌스 제안 저장 실패 ===");
+            System.err.println("Error: " + e.getMessage());
+            System.err.println("Error type: " + e.getClass().getSimpleName());
+            e.printStackTrace();
+            throw e;
         }
+    }
+    
+    /**
+     * 2단계: 거버넌스 제안 수수료 충전 (Admin에서 제안자로)
+     */
+    public String chargeProposalFee(
+            ProposalId proposalId,
+            String creatorWalletAddress,
+            String networkType) {
         
-        // 4. 토큰 차감 (제안 수수료) - 실제 블록체인에서 이미 처리됨
-        tokenAccount.burnTokens(proposalFee, "제안 수수료: " + proposal.getTitle());
+        try {
+            // 1. 제안 조회 및 유효성 검증
+            Proposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new RuntimeException("Proposal not found: " + proposalId.getValue()));
+            
+            NetworkType networkTypeEnum = NetworkType.valueOf(networkType.toUpperCase());
+            BigDecimal proposalFee = new BigDecimal("0.01");
+
+            System.out.println("=== 💰 거버넌스 제안 수수료 충전 시작 ===");
+            System.out.println("제안 ID: " + proposalId.getValue());
+            System.out.println("제안자 지갑: " + creatorWalletAddress);
+            System.out.println("필요 수수료: " + proposalFee);
+            System.out.println("네트워크: " + networkTypeEnum);
+
+            // 2. Admin 지갑 정보 조회
+            System.out.println("=== 🔍 Admin 지갑 정보 조회 중... ===");
+            AdminWalletService.AdminWalletInfo adminWallet = AdminWalletService.getAdminWallet(networkTypeEnum);
+
+            // 3. Admin에서 제안자로 수수료 전송
+            TransactionResult feeTransferResult = transactionOrchestrator.executeTransfer(
+                adminWallet.getWalletAddress(),
+                creatorWalletAddress,
+                networkTypeEnum,
+                proposalFee,
+    null
+            );
+            
+            if (!feeTransferResult.isSuccess()) {
+                System.err.println("❌ 수수료 전송 실패: " + feeTransferResult.getErrorMessage());
+                throw new RuntimeException("Failed to transfer proposal fee: " + feeTransferResult.getErrorMessage());
+            }
+            
+            System.out.println("✅ 수수료 전송 성공!");
+            System.out.println("수수료 트랜잭션 해시: " + feeTransferResult.getTransactionHash());
+            System.out.println("=== 💰 거버넌스 제안 수수료 충전 완료 ===");
+            
+            // 4. 제안자의 토큰 계정에 수수료 추가 (임시로 제거)
+             TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
+                 proposal.getCreatorId(), creatorWalletAddress, networkTypeEnum, "default-contract", "TOKEN");
+             tokenAccount.receiveTokens(proposalFee, "거버넌스 제안 수수료 충전: " + proposal.getTitle());
+             tokenAccountRepository.save(tokenAccount);
+            
+            return feeTransferResult.getTransactionHash();
+            
+        } catch (Exception e) {
+            System.err.println("=== ❌ 수수료 충전 실패 ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+    
+    /**
+     * 3단계: 거버넌스 제안을 블록체인 네트워크로 브로드캐스트
+     */
+    public String broadcastProposal(
+            ProposalId proposalId,
+            String creatorWalletAddress,
+            String networkType) {
         
-        // 5. 블록체인 트랜잭션 기록 (실제 블록체인 트랜잭션 해시 저장)
-        Transaction transaction = new Transaction(
-            tokenAccount.getUserId(),
-            BlockchainTransactionType.TOKEN_BURN,
-            NetworkType.valueOf(networkType.toUpperCase()),
-            proposalFee,
-            creatorWalletAddress,
-            null, // BURN은 toAddress 없음
-            "제안 수수료: " + proposal.getTitle()
-        );
-        transaction.confirm(txResult.getTransactionHash()); // 실제 블록체인 트랜잭션 해시
-        transactionRepository.save(transaction);
-        
-        return ProposalDto.from(proposal, txResult.getTransactionHash(), creatorWalletAddress);
+        try {
+            // 1. 제안 조회 및 유효성 검증
+            Proposal proposal = proposalRepository.findById(proposalId)
+                .orElseThrow(() -> new RuntimeException("Proposal not found: " + proposalId.getValue()));
+            
+            NetworkType networkTypeEnum = NetworkType.valueOf(networkType.toUpperCase());
+            BigDecimal proposalFee = new BigDecimal("0.00029");
+
+            System.out.println("=== 🚀 거버넌스 제안 블록체인 브로드캐스트 시작 ===");
+            System.out.println("제안 ID: " + proposalId.getValue());
+            System.out.println("제목: " + proposal.getTitle());
+            System.out.println("제안자 지갑: " + creatorWalletAddress);
+            System.out.println("네트워크: " + networkTypeEnum);
+
+            // 2. 블록체인에 거버넌스 제안 트랜잭션 실행
+            TransactionResult txResult = transactionOrchestrator.executeProposalCreation(
+                proposal.getId().getValue(),
+                proposal.getTitle(),
+                proposal.getDescription(),
+                creatorWalletAddress,
+                networkTypeEnum,
+                proposalFee,
+                proposal.getVotingPeriod().getStartDate(),
+                proposal.getVotingPeriod().getEndDate(),
+                BigDecimal.valueOf(proposal.getRequiredQuorum())
+            );
+            
+            if (!txResult.isSuccess()) {
+                System.err.println("❌ 블록체인 브로드캐스트 실패: " + txResult.getErrorMessage());
+                throw new RuntimeException("Failed to broadcast proposal: " + txResult.getErrorMessage());
+            }
+            
+            String transactionHash = txResult.getTransactionHash();
+            System.out.println("✅ 블록체인 브로드캐스트 성공!");
+            System.out.println("거버넌스 트랜잭션 해시: " + transactionHash);
+            System.out.println("=== 🚀 거버넌스 제안 블록체인 브로드캐스트 완료 ===");
+            
+            // 3. 제안 수수료가 있는 경우 토큰 차감
+            if (proposalFee.compareTo(BigDecimal.ZERO) > 0) {
+                TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
+                    proposal.getCreatorId(), creatorWalletAddress, networkTypeEnum, "default-contract", "TOKEN");
+                tokenAccount.burnTokens(proposalFee, "제안 수수료: " + proposal.getTitle());
+                tokenAccountRepository.save(tokenAccount);
+            }
+            
+            // 4. 블록체인 트랜잭션 기록
+            Transaction transaction = new Transaction(
+                proposal.getCreatorId(),
+                BlockchainTransactionType.PROPOSAL_CREATE,
+                networkTypeEnum,
+                proposalFee,
+                creatorWalletAddress,
+                null, // 제안 생성은 toAddress 없음
+                "거버넌스 제안 생성: " + proposal.getTitle()
+            );
+            transaction.confirm(transactionHash);
+            transactionRepository.save(transaction);
+            
+            return transactionHash;
+            
+        } catch (Exception e) {
+            System.err.println("=== ❌ 블록체인 브로드캐스트 실패 ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     /**
@@ -155,6 +351,43 @@ public class GovernanceApplicationService {
         transactionRepository.save(transaction);
         
         return VoteDto.from(vote, "SNAPSHOT_VOTE_" + vote.getId().getValue(), voterWalletAddress);
+    }
+    
+    /**
+     * 투표권 위임
+     */
+    public String delegateVotes(
+            String delegateeWalletAddress,
+            String networkType) {
+        
+        try {
+            NetworkType networkTypeEnum = NetworkType.valueOf(networkType.toUpperCase());
+            AdminWalletService.AdminWalletInfo adminWallet = AdminWalletService.getAdminWallet(networkTypeEnum);
+
+            // TransactionOrchestrator를 통해 위임 트랜잭션 실행
+            TransactionResult txResult = transactionOrchestrator.executeDelegationCreation(
+                adminWallet.getWalletAddress(),
+                delegateeWalletAddress,
+                networkTypeEnum
+            );
+
+            if (!txResult.isSuccess()) {
+                throw new RuntimeException("Failed to delegate votes: " + txResult.getErrorMessage());
+            }
+            
+            String transactionHash = txResult.getTransactionHash();
+            System.out.println("✅ 투표권 위임 성공!");
+            System.out.println("위임 트랜잭션 해시: " + transactionHash);
+            System.out.println("=== 🎯 투표권 위임 완료 ===");
+            
+            return transactionHash;
+            
+        } catch (Exception e) {
+            System.err.println("=== ❌ 투표권 위임 실패 ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     // ===== 조회 메서드들 =====

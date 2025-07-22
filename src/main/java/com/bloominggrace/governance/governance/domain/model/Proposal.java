@@ -40,12 +40,6 @@ public class Proposal extends AggregateRoot {
     private VotingPeriod votingPeriod;
     
     @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "totalVotes", column = @Column(name = "total_votes")),
-        @AttributeOverride(name = "yesVotes", column = @Column(name = "yes_votes")),
-        @AttributeOverride(name = "noVotes", column = @Column(name = "no_votes")),
-        @AttributeOverride(name = "abstainVotes", column = @Column(name = "abstain_votes"))
-    })
     private VoteResults voteResults;
     
     @Column(name = "required_quorum")

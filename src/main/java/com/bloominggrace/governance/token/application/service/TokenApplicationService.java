@@ -36,67 +36,73 @@ public class TokenApplicationService {
      * 토큰 계정 생성 또는 조회
      */
     public TokenAccount getOrCreateTokenAccount(UserId userId, String walletAddress, NetworkType network, String contract, String symbol) {
-        return tokenAccountRepository.findByWalletAddress(walletAddress)
-            .stream().findFirst()
-            .orElseGet(() -> {
-                // Wallet 객체를 찾아야 함
-                Wallet wallet = walletApplicationService.getWalletByAddress(walletAddress)
-                    .orElseThrow(() -> new IllegalStateException("Wallet not found: " + walletAddress));
-                TokenAccount newAccount = new TokenAccount(
-                    wallet,
-                    userId,
-                    network,
-                    contract,
-                    symbol
-                );
-                return tokenAccountRepository.save(newAccount);
-            });
+        // 먼저 특정 네트워크와 컨트랙트로 토큰 계정을 찾음
+        Optional<TokenAccount> existingTokenAccount = tokenAccountRepository.findByWalletAddressAndNetworkAndContract(walletAddress, network, contract);
+        
+        if (existingTokenAccount.isPresent()) {
+            return existingTokenAccount.get();
+        }
+        
+        // 없으면 새로 생성
+        Wallet wallet = walletApplicationService.getWalletByAddress(walletAddress)
+            .orElseThrow(() -> new IllegalStateException("Wallet not found: " + walletAddress));
+        
+        TokenAccount newAccount = new TokenAccount(
+            wallet,
+            userId,
+            network,
+            contract,
+            symbol
+        );
+        return tokenAccountRepository.save(newAccount);
     }
 
-//    /**
-//     * 토큰 발행 (Mint)
-//     */
-//    public String mintTokens(
-//            UserId userId,
-//            String walletAddress,
-//            BigDecimal amount,
-//            String description,
-//            String networkType) {
-//
-//        NetworkType network = NetworkType.valueOf(networkType.toUpperCase());
-//        TokenAccount tokenAccount = getOrCreateTokenAccount(userId, walletAddress, network, "default-contract", "TOKEN");
-//
-//        // TransactionOrchestrator를 통한 토큰 민팅 트랜잭션 실행
-//        TransactionResult result = transactionOrchestrator.executeTokenMint(
-//            walletAddress,
-//            network,
-//            amount,
-//            "default-contract"
-//        );
-//
-//        if (!result.isSuccess()) {
-//            throw new RuntimeException("Failed to mint tokens: " + result.getErrorMessage());
-//        }
-//
-//        // 토큰 발행
-//        tokenAccount.mintTokens(amount, description);
-//        tokenAccountRepository.save(tokenAccount);
-//
-//        // 트랜잭션 기록
-//        Transaction transaction = new Transaction(
-//            userId,
-//            BlockchainTransactionType.TOKEN_MINT,
-//            network,
-//            amount,
-//            walletAddress,
-//            null,
-//            description
-//        );
-//        transaction.confirm(result.getTransactionHash());
-//        transactionRepository.save(transaction);
-//
-//        return result.getTransactionHash();
-//    }
+    /**
+     * 토큰 발행 (Mint)
+     */
+    public String mintTokens(
+            UserId userId,
+            String walletAddress,
+            BigDecimal amount,
+            String description,
+            String networkType) {
+
+        NetworkType network = NetworkType.valueOf(networkType.toUpperCase());
+        TokenAccount tokenAccount = getOrCreateTokenAccount(userId, walletAddress, network, "default-contract", "TOKEN");
+
+        // TransactionOrchestrator를 통한 토큰 전송 트랜잭션 실행 (Admin에서 사용자로)
+        String adminWalletAddress = "0x55D5c49e36f8A89111687C9DC8355121068f0cD8";
+        TransactionResult result = transactionOrchestrator.executeTransfer(
+            adminWalletAddress,
+            walletAddress,
+            network,
+            amount,
+            "default-contract"
+        );
+
+        if (!result.isSuccess()) {
+            throw new RuntimeException("Failed to mint tokens: " + result.getErrorMessage());
+        }
+
+        // 토큰 발행
+        tokenAccount.mintTokens(amount, description);
+        tokenAccountRepository.save(tokenAccount);
+
+        // 트랜잭션 기록
+        Transaction transaction = new Transaction(
+            userId,
+            BlockchainTransactionType.TOKEN_MINT,
+            network,
+            amount,
+            walletAddress,
+            null,
+            description
+        );
+        transaction.confirm(result.getTransactionHash());
+        transactionRepository.save(transaction);
+
+        return result.getTransactionHash();
+    }
 
 //    /**
 //     * 토큰 소각 (Burn)

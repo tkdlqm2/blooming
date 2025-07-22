@@ -1,7 +1,9 @@
 package com.bloominggrace.governance.shared.domain;
 
+import jakarta.persistence.MappedSuperclass;
 import java.util.UUID;
 
+@MappedSuperclass
 public abstract class EntityId {
     protected UUID value;
 

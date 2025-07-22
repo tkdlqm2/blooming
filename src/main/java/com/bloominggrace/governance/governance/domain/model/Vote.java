@@ -16,7 +16,7 @@ public class Vote extends ValueObject {
     
     @Embedded
     @AttributeOverrides({
-        @AttributeOverride(name = "id", column = @Column(name = "proposal_id"))
+        @AttributeOverride(name = "value", column = @Column(name = "proposal_id"))
     })
     private ProposalId proposalId;
     

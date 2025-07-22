@@ -37,6 +37,9 @@ public class VoteResultsDto {
     }
 
     public static VoteResultsDto from(VoteResults voteResults) {
+        if (voteResults == null) {
+            return null;
+        }
         return VoteResultsDto.builder()
             .totalVotes(voteResults.getTotalVotes())
             .yesVotes(voteResults.getYesVotes())

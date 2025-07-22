@@ -73,7 +73,7 @@ if [ -z "$TOKEN" ]; then
 fi
 
 log_success "회원가입 성공 - 사용자 ID: $USER_ID"
-log_debug "JWT 토큰: ${TOKEN:0:50}..."
+log_debug "JWT 토큰: ${TOKEN}"
 
 # 2. 무료 포인트 수령
 log_info "2️⃣ 무료 포인트 수령 중..."

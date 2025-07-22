@@ -1,11 +1,11 @@
 package com.bloominggrace.governance.governance.application.dto;
 
-import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -18,8 +18,8 @@ public class CreateProposalRequest {
     private String description;
     private LocalDateTime votingStartDate;
     private LocalDateTime votingEndDate;
-    private PointAmount requiredQuorum;
+    private BigDecimal requiredQuorum;
     private String creatorWalletAddress;
-    private PointAmount proposalFee;
+    private BigDecimal proposalFee;
     private NetworkType networkType;
 } 

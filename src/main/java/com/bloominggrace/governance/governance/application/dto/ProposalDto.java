@@ -19,6 +19,8 @@ public class ProposalDto {
     private final long requiredQuorum;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
+    private final String transactionSignature;
+    private final String creatorWalletAddress;
 
     public ProposalDto(
             UUID id,
@@ -30,7 +32,9 @@ public class ProposalDto {
             VoteResultsDto voteResults,
             long requiredQuorum,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
+            LocalDateTime updatedAt,
+            String transactionSignature,
+            String creatorWalletAddress) {
         this.id = id;
         this.creatorId = creatorId;
         this.title = title;
@@ -41,12 +45,14 @@ public class ProposalDto {
         this.requiredQuorum = requiredQuorum;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.transactionSignature = transactionSignature;
+        this.creatorWalletAddress = creatorWalletAddress;
     }
 
     public static ProposalDto from(Proposal proposal) {
         return ProposalDto.builder()
             .id(proposal.getId().getValue())
-            .creatorId(proposal.getCreatorId().getValue())
+            .creatorId(proposal.getCreatorId() != null ? proposal.getCreatorId().getValue() : null)
             .title(proposal.getTitle())
             .description(proposal.getDescription())
             .status(proposal.getStatus().name())
@@ -55,13 +61,15 @@ public class ProposalDto {
             .requiredQuorum(proposal.getRequiredQuorum())
             .createdAt(proposal.getCreatedAt())
             .updatedAt(proposal.getUpdatedAt())
+            .transactionSignature(null)
+            .creatorWalletAddress(null)
             .build();
     }
     
     public static ProposalDto from(Proposal proposal, String transactionSignature, String creatorWalletAddress) {
         return ProposalDto.builder()
             .id(proposal.getId().getValue())
-            .creatorId(proposal.getCreatorId().getValue())
+            .creatorId(proposal.getCreatorId() != null ? proposal.getCreatorId().getValue() : null)
             .title(proposal.getTitle())
             .description(proposal.getDescription())
             .status(proposal.getStatus().name())
@@ -70,6 +78,8 @@ public class ProposalDto {
             .requiredQuorum(proposal.getRequiredQuorum())
             .createdAt(proposal.getCreatedAt())
             .updatedAt(proposal.getUpdatedAt())
+            .transactionSignature(transactionSignature)
+            .creatorWalletAddress(creatorWalletAddress)
             .build();
     }
     
@@ -88,6 +98,8 @@ public class ProposalDto {
         private long requiredQuorum;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private String transactionSignature;
+        private String creatorWalletAddress;
         
         public ProposalDtoBuilder id(UUID id) {
             this.id = id;
@@ -139,8 +151,18 @@ public class ProposalDto {
             return this;
         }
         
+        public ProposalDtoBuilder transactionSignature(String transactionSignature) {
+            this.transactionSignature = transactionSignature;
+            return this;
+        }
+        
+        public ProposalDtoBuilder creatorWalletAddress(String creatorWalletAddress) {
+            this.creatorWalletAddress = creatorWalletAddress;
+            return this;
+        }
+        
         public ProposalDto build() {
-            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt);
+            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, transactionSignature, creatorWalletAddress);
         }
     }
 
@@ -182,5 +204,13 @@ public class ProposalDto {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+    
+    public String getTransactionSignature() {
+        return transactionSignature;
+    }
+    
+    public String getCreatorWalletAddress() {
+        return creatorWalletAddress;
     }
 } 

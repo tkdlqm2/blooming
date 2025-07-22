@@ -8,9 +8,11 @@ import com.bloominggrace.governance.shared.util.HexUtils;
 import com.bloominggrace.governance.shared.domain.model.TransactionBody;
 import com.bloominggrace.governance.shared.domain.model.EthereumTransactionData;
 import com.bloominggrace.governance.shared.domain.model.EthereumTransactionBodyFactory;
+import com.bloominggrace.governance.shared.infrastructure.service.ethereum.EthereumRawTransactionBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -26,6 +28,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class EthereumGovernanceContractService implements BlockchainGovernanceService {
     
     @Value("${blockchain.ethereum.governance-contract}")
@@ -37,7 +40,11 @@ public class EthereumGovernanceContractService implements BlockchainGovernanceSe
     @Value("${blockchain.ethereum.rpc-url}")
     private String ethereumRpcUrl;
     
+    private final EthereumRawTransactionBuilder rawTransactionBuilder;
+
     // Function selectors (keccak256의 첫 4바이트)
+    // 실제 거버넌스 컨트랙트의 propose() 함수 시그니처
+    private static final byte[] PROPOSE_SELECTOR = HexUtils.hexToBytes("0x1c4afc57");
     private static final byte[] CREATE_PROPOSAL_SELECTOR = HexUtils.hexToBytes("0x12345678");
     private static final byte[] VOTE_SELECTOR = HexUtils.hexToBytes("0x87654321");
     private static final byte[] EXECUTE_PROPOSAL_SELECTOR = HexUtils.hexToBytes("0xabcdef12");
@@ -98,19 +105,13 @@ public class EthereumGovernanceContractService implements BlockchainGovernanceSe
         try {
             log.info("Creating Ethereum proposal transaction - ProposalId: {}, Title: {}", proposalId, title);
             
-            // 1. 트랜잭션 데이터 생성
-            byte[] transactionData = createProposalTransactionData(
-                new ProposalId(UUID.fromString(proposalId)),
-                title,
-                description,
-                creatorWalletAddress,
-                proposalFee
-            );
+            // 실제 거버넌스 컨트랙트의 propose() 함수 호출
+            byte[] transactionData = createProposeTransactionData(title, description);
             
             // 2. EthereumTransactionData 생성
             EthereumTransactionData ethereumData = new EthereumTransactionData(
                 BigInteger.valueOf(20_000_000_000L), // 20 Gwei
-                BigInteger.valueOf(21000L), // 기본 가스 한도
+                BigInteger.valueOf(500000L), // 거버넌스 제안 가스 한도 증가
                 BigInteger.ZERO, // 컨트랙트 호출이므로 value는 0
                 getGovernanceContractAddress(),
                 getGovernanceContractAddress(),
@@ -131,6 +132,57 @@ public class EthereumGovernanceContractService implements BlockchainGovernanceSe
         } catch (Exception e) {
             log.error("Error creating Ethereum proposal transaction", e);
             throw new RuntimeException("Failed to create Ethereum proposal transaction", e);
+        }
+    }
+    
+    /**
+     * 실제 거버넌스 컨트랙트의 propose() 함수 호출을 위한 트랜잭션 데이터 생성
+     * propose(string memory description, string memory details)
+     */
+    public byte[] createProposeTransactionData(String description, String details) {
+        try {
+            ByteBuffer buffer = ByteBuffer.allocate(1024);
+            
+            // 1. Function selector (propose 함수)
+            buffer.put(PROPOSE_SELECTOR);
+            
+            // 2. Description (string) - 동적 타입이므로 오프셋 위치
+            buffer.put(new byte[32]); // description의 오프셋 (나중에 계산)
+            
+            // 3. Details (string) - 동적 타입이므로 오프셋 위치  
+            buffer.put(new byte[32]); // details의 오프셋 (나중에 계산)
+            
+            // 4. Description 문자열 데이터
+            byte[] descriptionBytes = description.getBytes(StandardCharsets.UTF_8);
+            int descriptionLength = descriptionBytes.length;
+            buffer.put(BigInteger.valueOf(descriptionLength).toByteArray());
+            buffer.put(descriptionBytes);
+            
+            // 5. Details 문자열 데이터
+            byte[] detailsBytes = details.getBytes(StandardCharsets.UTF_8);
+            int detailsLength = detailsBytes.length;
+            buffer.put(BigInteger.valueOf(detailsLength).toByteArray());
+            buffer.put(detailsBytes);
+            
+            // 6. 오프셋 값들을 올바른 위치에 설정
+            byte[] result = Arrays.copyOf(buffer.array(), buffer.position());
+            
+            // Description 오프셋: 64 (두 개의 uint256 오프셋 이후)
+            byte[] descriptionOffset = BigInteger.valueOf(64).toByteArray();
+            System.arraycopy(descriptionOffset, 0, result, 4, descriptionOffset.length);
+            
+            // Details 오프셋: 64 + description 길이 + 32 (description 길이 필드)
+            int detailsOffset = 64 + 32 + descriptionLength;
+            byte[] detailsOffsetBytes = BigInteger.valueOf(detailsOffset).toByteArray();
+            System.arraycopy(detailsOffsetBytes, 0, result, 36, detailsOffsetBytes.length);
+            
+            log.info("Created Ethereum propose transaction data: {} bytes", result.length);
+            log.info("Description: '{}', Details: '{}'", description, details);
+            return result;
+            
+        } catch (Exception e) {
+            log.error("Error creating Ethereum propose transaction data", e);
+            throw new RuntimeException("Failed to create Ethereum propose transaction data", e);
         }
     }
     

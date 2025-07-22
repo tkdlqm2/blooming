@@ -131,7 +131,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getNonce(String address) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionCount", Arrays.asList(address, "latest"));
+            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionCount", Arrays.asList(address, "pending"));
             EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
             
             if (response.hasError()) {

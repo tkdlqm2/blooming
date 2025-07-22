@@ -24,12 +24,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
 import com.bloominggrace.governance.user.domain.model.User;
 import com.bloominggrace.governance.user.infrastructure.repository.UserRepository;
 import com.bloominggrace.governance.shared.util.Base58Utils;
 import org.springframework.context.ApplicationContext;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service("solanaWalletService")
 public class SolanaWalletService extends WalletService {
     
@@ -215,5 +218,75 @@ public class SolanaWalletService extends WalletService {
         
         // Base58 형식 검증
         return Base58Utils.isValid(address);
+    }
+
+    @Override
+    public UnlockResult unlockWallet(String walletAddress) {
+        try {
+            log.info("Attempting to unlock Solana wallet: {}", walletAddress);
+            
+            // 1. 지갑 주소 유효성 검증
+            if (!isValidAddress(walletAddress)) {
+                return UnlockResult.failure(walletAddress, "Invalid Solana address format");
+            }
+            
+            // 2. 데이터베이스에서 지갑 조회
+            Optional<Wallet> walletOpt = findByAddress(walletAddress);
+            if (walletOpt.isEmpty()) {
+                return UnlockResult.failure(walletAddress, "Wallet not found in database");
+            }
+            
+            Wallet wallet = walletOpt.get();
+            log.info("Found wallet in database for address: {}", walletAddress);
+            
+            // 3. 암호화된 프라이빗 키 복호화
+            String encryptedPrivateKey = wallet.getEncryptedPrivateKey();
+            String decryptedPrivateKey;
+            
+            try {
+                decryptedPrivateKey = encryptionService.decrypt(encryptedPrivateKey);
+                log.info("Successfully decrypted private key for wallet: {}", walletAddress);
+            } catch (Exception e) {
+                log.error("Failed to decrypt private key for wallet: {}", walletAddress, e);
+                return UnlockResult.failure(walletAddress, "Failed to decrypt private key: " + e.getMessage());
+            }
+            
+            // 4. 프라이빗 키 유효성 검증
+            if (decryptedPrivateKey == null || decryptedPrivateKey.trim().isEmpty()) {
+                return UnlockResult.failure(walletAddress, "Decrypted private key is null or empty");
+            }
+            
+            // 5. 프라이빗 키로부터 주소 재생성 (Solana Ed25519)
+            String derivedAddress;
+            try {
+                byte[] privateKeyBytes = hexStringToByteArray(decryptedPrivateKey);
+                Ed25519PrivateKeyParameters privateKeyParams = new Ed25519PrivateKeyParameters(privateKeyBytes, 0);
+                Ed25519PublicKeyParameters publicKeyParams = privateKeyParams.generatePublicKey();
+                byte[] publicKeyBytes = publicKeyParams.getEncoded();
+                
+                // Base58 인코딩으로 주소 생성
+                derivedAddress = Base58Utils.encode(publicKeyBytes);
+                log.info("Successfully derived Solana address from private key: {}", derivedAddress);
+            } catch (Exception e) {
+                log.error("Failed to derive Solana address from private key for wallet: {}", walletAddress, e);
+                return UnlockResult.failure(walletAddress, "Failed to derive Solana address from private key: " + e.getMessage());
+            }
+            
+            // 6. 주소 일치 여부 확인
+            boolean addressMatch = walletAddress.equals(derivedAddress);
+            
+            if (addressMatch) {
+                log.info("✅ Solana wallet unlock successful - Address match confirmed for: {}", walletAddress);
+                return UnlockResult.success(walletAddress, derivedAddress, true);
+            } else {
+                log.warn("⚠️ Solana wallet unlock failed - Address mismatch for: {}", walletAddress);
+                log.warn("Expected: {}, Derived: {}", walletAddress, derivedAddress);
+                return UnlockResult.success(walletAddress, derivedAddress, false);
+            }
+            
+        } catch (Exception e) {
+            log.error("Unexpected error during Solana wallet unlock for: {}", walletAddress, e);
+            return UnlockResult.failure(walletAddress, "Unexpected error: " + e.getMessage());
+        }
     }
 } 

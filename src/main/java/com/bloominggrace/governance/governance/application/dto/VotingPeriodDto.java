@@ -28,6 +28,9 @@ public class VotingPeriodDto {
     }
 
     public static VotingPeriodDto from(VotingPeriod votingPeriod) {
+        if (votingPeriod == null) {
+            return null;
+        }
         return new VotingPeriodDto(
             votingPeriod.getStartDate(),
             votingPeriod.getEndDate(),

@@ -10,6 +10,8 @@ import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
 import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
 import com.bloominggrace.governance.token.application.service.TokenAccountApplicationService;
+import com.bloominggrace.governance.token.domain.model.TokenAccount;
+import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountRepository;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class ExchangeApplicationService {
     private final PointManagementService pointManagementService;
     private final TokenAccountApplicationService tokenAccountApplicationService;
     private final TransactionOrchestrator transactionOrchestrator;
+    private final TokenAccountRepository tokenAccountRepository;
     
     // 포인트 → 토큰 교환 비율 (1 포인트 = 0.01 토큰)
     private static final BigDecimal EXCHANGE_RATE = new BigDecimal("0.01");
@@ -221,11 +224,46 @@ public class ExchangeApplicationService {
      */
     private void createOrUpdateTokenAccount(ExchangeRequest exchangeRequest) {
         NetworkType networkType = determineNetworkType(exchangeRequest.getWalletAddress());
-        tokenAccountApplicationService.findOrCreateDefaultTokenAccount(
-            exchangeRequest.getUserId().toString(),
+        String contractAddress = getTokenContractAddress(networkType);
+        BigDecimal tokenAmount = calculateTokenAmount(exchangeRequest);
+        
+        log.info("Creating or updating token account - UserId: {}, WalletAddress: {}, Network: {}, Contract: {}, TokenAmount: {}", 
+            exchangeRequest.getUserId(), exchangeRequest.getWalletAddress(), networkType, contractAddress, tokenAmount);
+        
+        // 1. 토큰 계정 조회 또는 생성
+        TokenAccount tokenAccount = tokenAccountApplicationService.getOrCreateTokenAccount(
+            new UserId(exchangeRequest.getUserId()),
             exchangeRequest.getWalletAddress(),
-            networkType
+            networkType,
+            contractAddress,
+            getTokenSymbol(networkType)
         );
+        
+        // 2. 토큰 잔액 업데이트 (Exchange로 받은 토큰 추가)
+        BigDecimal currentBalance = tokenAccount.getTotalBalance();
+        BigDecimal newBalance = currentBalance.add(tokenAmount);
+        
+        log.info("Updating token balance - Current: {}, Added: {}, New: {}", currentBalance, tokenAmount, newBalance);
+        
+        // receiveTokens 메서드를 사용하여 토큰 수령 처리
+        tokenAccount.receiveTokens(tokenAmount, "Exchange from points: " + exchangeRequest.getPointAmount().getAmount() + " points");
+        tokenAccountRepository.save(tokenAccount);
+        
+        log.info("Token account updated successfully - AccountId: {}, NewBalance: {}", tokenAccount.getId(), tokenAccount.getTotalBalance());
+    }
+    
+    /**
+     * 토큰 심볼 가져오기
+     */
+    private String getTokenSymbol(NetworkType networkType) {
+        switch (networkType) {
+            case ETHEREUM:
+                return BlockchainMetadata.Ethereum.ERC20_SYMBOL;
+            case SOLANA:
+                return BlockchainMetadata.Solana.SPL_TOKEN_SYMBOL;
+            default:
+                throw new IllegalArgumentException("Unsupported network type: " + networkType);
+        }
     }
     
     /**

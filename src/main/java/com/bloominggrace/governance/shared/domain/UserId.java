@@ -1,7 +1,9 @@
 package com.bloominggrace.governance.shared.domain;
 
+import jakarta.persistence.Embeddable;
 import java.util.UUID;
 
+@Embeddable
 public class UserId extends EntityId {
     
     // JPA 엔티티를 위한 기본 생성자

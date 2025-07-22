@@ -2,10 +2,13 @@ package com.bloominggrace.governance.wallet.domain.service;
 
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.util.Base58Utils;
+
+import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.UUID;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.web3j.crypto.Credentials;
 
 /**
  * Static utility class for generating key pairs and addresses for different blockchain networks.
@@ -83,15 +86,62 @@ public class KeyPairProvider {
      */
     private static KeyPairResult generateEthereumKeyPair() {
         // Generate common seed and private key
-        byte[] seed = generateSeed();
-        String privateKey = generatePrivateKey(32);
-        
-        // Generate Ethereum address
-        String address = generateEthereumAddress(seed);
-        
+        // 1. 유효한 프라이빗 키 생성
+        String privateKey = generateValidEthereumPrivateKey();
+
+        // 2. 프라이빗 키로부터 올바른 주소 생성
+        String address = deriveAddressFromPrivateKey(privateKey);
+
         return new KeyPairResult(privateKey, address);
     }
-    
+
+    private static String generateValidEthereumPrivateKey() {
+        BigInteger maxValue = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140", 16);
+        BigInteger privateKeyBigInt;
+
+        do {
+            byte[] privateKeyBytes = new byte[32];
+            SECURE_RANDOM.nextBytes(privateKeyBytes);
+            // BigInteger.ZERO가 아닌 양수로 생성
+            privateKeyBigInt = new BigInteger(1, privateKeyBytes);
+        } while (privateKeyBigInt.equals(BigInteger.ZERO) || 
+                 privateKeyBigInt.compareTo(BigInteger.ONE) < 0 || 
+                 privateKeyBigInt.compareTo(maxValue) >= 0);
+
+        // 64자리로 패딩 (Java에서는 String.format 사용)
+        return String.format("%064x", privateKeyBigInt);
+    }
+
+    private static String deriveAddressFromPrivateKey(String privateKey) {
+        try {
+            // 0x 접두사가 있다면 제거
+            String cleanPrivateKey = privateKey.startsWith("0x") ?
+                    privateKey.substring(2) : privateKey;
+
+            // 64자리인지 확인
+            if (cleanPrivateKey.length() != 64) {
+                throw new IllegalArgumentException("Private key must be 64 hex characters");
+            }
+
+            // 16진수 형식 검증
+            if (!cleanPrivateKey.matches("[0-9a-fA-F]{64}")) {
+                throw new IllegalArgumentException("Private key must be valid hexadecimal");
+            }
+
+            Credentials credentials = Credentials.create(cleanPrivateKey);
+            String address = credentials.getAddress();
+            
+            // 주소 유효성 검증 (0x로 시작하고 40자리 16진수)
+            if (!address.matches("0x[0-9a-fA-F]{40}")) {
+                throw new RuntimeException("Generated address is invalid: " + address);
+            }
+            
+            return address;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to derive address from private key: " + e.getMessage(), e);
+        }
+    }
+
     /**
      * Generates Solana key pair and address using Ed25519.
      * 
@@ -129,19 +179,7 @@ public class KeyPairProvider {
             return new KeyPairResult(privateKey, address);
         }
     }
-    
-    /**
-     * Generates an Ethereum-style address.
-     * 
-     * @param seed the seed for address generation
-     * @return Ethereum address
-     */
-    private static String generateEthereumAddress(byte[] seed) {
-        // Use seed to generate deterministic but random-looking address
-        String addressHex = bytesToHex(seed).substring(0, 40);
-        return "0x" + addressHex;
-    }
-    
+
     /**
      * Result class containing the generated key pair and address.
      */
