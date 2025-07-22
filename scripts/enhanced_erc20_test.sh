@@ -45,8 +45,8 @@ TIMESTAMP=$(date +%s)
 USERNAME="testuser_${TIMESTAMP}"
 EMAIL="${USERNAME}@example.com"
 PASSWORD="password123"
-POINT_AMOUNT=200
-EXCHANGE_AMOUNT=100
+POINT_AMOUNT=200000
+EXCHANGE_AMOUNT=101000
 
 echo ""
 log_info "🚀 향상된 ERC20 토큰 전송 테스트 시작"
@@ -256,6 +256,19 @@ if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
         # 8-3. 3단계: 블록체인 브로드캐스트 (수수료 충전이 성공한 경우에만)
         if [ -n "$FEE_SUCCESS" ]; then
             log_info "8️⃣-3️⃣ 3단계: 블록체인 브로드캐스트 중..."
+            
+            # curl 명령어 출력
+            BROADCAST_CURL_CMD="curl -s -X POST \"${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/broadcast\" \
+                -H \"Content-Type: application/json\" \
+                -d '{
+                    \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
+                    \"proposalFee\": $PROPOSAL_FEE,
+                    \"networkType\": \"ETHEREUM\"
+                }'"
+            
+            log_debug "실행되는 curl 명령어:"
+            echo "$BROADCAST_CURL_CMD"
+            echo ""
 
             BROADCAST_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/broadcast" \
                 -H "Content-Type: application/json" \
@@ -264,6 +277,9 @@ if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
                     \"proposalFee\": $PROPOSAL_FEE,
                     \"networkType\": \"ETHEREUM\"
                 }")
+
+            log_debug "브로드캐스트 응답: $BROADCAST_RESPONSE"
+            echo ""
 
             BROADCAST_SUCCESS=$(echo "$BROADCAST_RESPONSE" | grep -o '"success":true')
 
