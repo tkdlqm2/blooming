@@ -175,8 +175,117 @@ else
     log_warning "트랜잭션 해시를 찾을 수 없습니다"
 fi
 
-# 8. 최종 포인트 잔액 확인
-log_info "8️⃣ 최종 포인트 잔액 확인 중..."
+# 8. 3단계 거버넌스 제안 프로세스 (txHash가 있을 때만)
+if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
+    log_info "8️⃣ 3단계 거버넌스 제안 프로세스 시작..."
+
+    # 제안 정보 설정
+    PROPOSAL_TITLE="ERC20 토큰 전송 테스트 제안"
+    PROPOSAL_DESCRIPTION="이 제안은 ERC20 토큰 전송 테스트의 일환으로 생성되었습니다. 트랜잭션 해시: $TXHASH"
+    VOTING_START_DATE=$(date -v+1d +%Y-%m-%dT%H:%M:%S)
+    VOTING_END_DATE=$(date -v+7d +%Y-%m-%dT%H:%M:%S)
+    REQUIRED_QUORUM=100
+    PROPOSAL_FEE=10.00
+
+    log_info "  제목: $PROPOSAL_TITLE"
+    log_info "  투표 시작: $VOTING_START_DATE"
+    log_info "  투표 종료: $VOTING_END_DATE"
+    log_info "  필요 정족수: $REQUIRED_QUORUM"
+    log_info "  제안 수수료: $PROPOSAL_FEE"
+
+    # 8-1. 1단계: 거버넌스 제안 저장
+    log_info "8️⃣-1️⃣ 1단계: 거버넌스 제안 저장 중..."
+
+    SAVE_PROPOSAL_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/save" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"creatorId\": \"$USER_ID\",
+            \"title\": \"$PROPOSAL_TITLE\",
+            \"description\": \"$PROPOSAL_DESCRIPTION\",
+            \"votingStartDate\": \"$VOTING_START_DATE\",
+            \"votingEndDate\": \"$VOTING_END_DATE\",
+            \"requiredQuorum\": $REQUIRED_QUORUM,
+            \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
+            \"proposalFee\": $PROPOSAL_FEE,
+            \"networkType\": \"ETHEREUM\"
+        }")
+
+    # 제안 ID 추출
+    PROPOSAL_ID=$(echo $SAVE_PROPOSAL_RESPONSE | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+
+    if [ -n "$PROPOSAL_ID" ]; then
+        log_success "🎉 1단계: 거버넌스 제안 저장 성공!"
+        log_info "  제안 ID: $PROPOSAL_ID"
+        log_info "  제안자: $USERNAME"
+        log_info "  지갑 주소: $WALLET_ADDRESS"
+    else
+        log_error "1단계: 거버넌스 제안 저장 실패: $SAVE_PROPOSAL_RESPONSE"
+        log_warning "거버넌스 제안 프로세스를 중단합니다"
+    fi
+
+    # 8-2. 2단계: 수수료 충전 (제안 저장이 성공한 경우에만)
+    if [ -n "$PROPOSAL_ID" ]; then
+        log_info "8️⃣-2️⃣ 2단계: 수수료 충전 중..."
+
+        CHARGE_FEE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/charge-fee" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
+                \"proposalFee\": $PROPOSAL_FEE,
+                \"networkType\": \"ETHEREUM\"
+            }")
+
+        echo $
+
+        FEE_SUCCESS=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"success":true')
+
+        if [ -n "$FEE_SUCCESS" ]; then
+            FEE_TX_HASH=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"feeTransactionHash":"[^"]*"' | cut -d'"' -f4)
+            log_success "🎉 2단계: 수수료 충전 성공!"
+            log_info "  수수료 트랜잭션 해시: $FEE_TX_HASH"
+            log_info "  충전된 수수료: $PROPOSAL_FEE"
+        else
+            log_error "2단계: 수수료 충전 실패: $CHARGE_FEE_RESPONSE"
+            log_warning "블록체인 브로드캐스트를 건너뜁니다"
+        fi
+
+
+        sleep 30
+        log_info "8️⃣-3️⃣ 3단계전 : 수수료 입금 확인 진행중 ... "
+
+        # 8-3. 3단계: 블록체인 브로드캐스트 (수수료 충전이 성공한 경우에만)
+        if [ -n "$FEE_SUCCESS" ]; then
+            log_info "8️⃣-3️⃣ 3단계: 블록체인 브로드캐스트 중..."
+
+            BROADCAST_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/broadcast" \
+                -H "Content-Type: application/json" \
+                -d "{
+                    \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
+                    \"proposalFee\": $PROPOSAL_FEE,
+                    \"networkType\": \"ETHEREUM\"
+                }")
+
+            BROADCAST_SUCCESS=$(echo "$BROADCAST_RESPONSE" | grep -o '"success":true')
+
+            if [ -n "$BROADCAST_SUCCESS" ]; then
+                GOVERNANCE_TX_HASH=$(echo "$BROADCAST_RESPONSE" | grep -o '"governanceTransactionHash":"[^"]*"' | cut -d'"' -f4)
+                log_success "🎉 3단계: 블록체인 브로드캐스트 성공!"
+                log_info "  거버넌스 트랜잭션 해시: $GOVERNANCE_TX_HASH"
+                log_info "  사용된 수수료: $PROPOSAL_FEE"
+                log_success "🚀 거버넌스 제안이 실제 블록체인에 등록되었습니다!"
+            else
+                log_error "3단계: 블록체인 브로드캐스트 실패: $BROADCAST_RESPONSE"
+            fi
+        fi
+    fi
+else
+    log_warning "8️⃣ 3단계 거버넌스 제안 프로세스 건너뛰기"
+    log_info "  트랜잭션 해시가 없어 거버넌스 제안을 생성할 수 없습니다"
+    log_info "  txHash: $TXHASH"
+fi
+
+# 9. 최종 포인트 잔액 확인
+log_info "9️⃣ 최종 포인트 잔액 확인 중..."
 FINAL_BALANCE_RESPONSE=$(curl -s -X GET "${BASE_URL}/api/points/balance" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN")
@@ -184,8 +293,8 @@ FINAL_BALANCE_RESPONSE=$(curl -s -X GET "${BASE_URL}/api/points/balance" \
 FINAL_AVAILABLE=$(echo $FINAL_BALANCE_RESPONSE | grep -o '"availableBalance":[0-9.]*' | cut -d':' -f2)
 log_success "최종 포인트 잔액 - 사용 가능: $FINAL_AVAILABLE"
 
-# 9. 모든 Exchange 요청 목록 확인
-log_info "9️⃣ 모든 Exchange 요청 목록 확인 중..."
+# 10. 모든 Exchange 요청 목록 확인
+log_info "🔟 모든 Exchange 요청 목록 확인 중..."
 EXCHANGE_LIST=$(curl -s -X GET "${BASE_URL}/api/exchange/all" \
     -H "Content-Type: application/json")
 
@@ -200,10 +309,24 @@ log_info "포인트 지급량: $POINT_AMOUNT"
 log_info "Exchange 신청량: $EXCHANGE_AMOUNT"
 log_info "Exchange 요청 ID: $EXCHANGE_ID"
 
-if [ -n "$TXHASH" ]; then
-    log_tx "✅ 트랜잭션 해시: $TXHASH"
+if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
+    log_tx "✅ ERC20 트랜잭션 해시: $TXHASH"
     log_success "🎉 새로운 executeERC20Transfer 구현이 성공적으로 실행되었습니다!"
     log_success "🚀 ERC20 토큰이 성공적으로 브로드캐스트되었습니다!"
+
+    if [ -n "$PROPOSAL_ID" ]; then
+        log_success "🗳️ 3단계 거버넌스 제안 프로세스 완료!"
+        log_info "  제안 ID: $PROPOSAL_ID"
+
+        if [ -n "$FEE_TX_HASH" ]; then
+            log_tx "  수수료 트랜잭션 해시: $FEE_TX_HASH"
+        fi
+
+        if [ -n "$GOVERNANCE_TX_HASH" ]; then
+            log_tx "  거버넌스 트랜잭션 해시: $GOVERNANCE_TX_HASH"
+            log_success "🚀 거버넌스 제안이 실제 블록체인에 등록되었습니다!"
+        fi
+    fi
 else
     log_warning "⚠️ 트랜잭션 해시를 확인할 수 없습니다"
     log_info "하지만 새로운 executeERC20Transfer 구현은 정상 작동합니다"
@@ -217,5 +340,12 @@ log_info "✅ BlockchainClient.broadcastTransaction() - 블록체인 브로드�
 log_info "✅ TransactionOrchestrator.executeERC20Transfer() - 전체 오케스트레이션"
 log_info "✅ 역할 분리된 설계로 안정성 향상"
 
+if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
+    log_info "✅ 3단계 거버넌스 제안 프로세스 - txHash 기반 조건부 실행"
+    log_info "  📝 1단계: 거버넌스 제안 저장"
+    log_info "  💰 2단계: 수수료 충전 (Admin → 제안자)"
+    log_info "  🚀 3단계: 블록체인 브로드캐스트"
+fi
+
 echo ""
-log_success "🎊 향상된 ERC20 토큰 전송 테스트 완료!" 
+log_success "🎊 향상된 ERC20 토큰 전송 + 3단계 거버넌스 제안 테스트 완료!"
