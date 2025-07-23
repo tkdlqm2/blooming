@@ -4,6 +4,7 @@ import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
 import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcError;
 import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcRequest;
 import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcResponse;
+import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import com.bloominggrace.governance.shared.util.HexUtils;
 import com.bloominggrace.governance.shared.util.JsonRpcClient;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
@@ -12,6 +13,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
@@ -21,6 +25,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -40,9 +45,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     
     @Value("${blockchain.ethereum.chain-id:11155111}")
     private String chainId;
-    
-    @Value("${blockchain.ethereum.admin-private-key}")
-    private String adminPrivateKey;
+
 
     public EthereumBlockchainClient(@Value("${blockchain.ethereum.rpc-url}") String rpcUrl,
                                    JsonRpcClient jsonRpcClient,
@@ -418,7 +421,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             return "0";
         }
     }
-    
+
     @Override
     public String calculateTransactionFee(String gasPrice, String gasLimit) {
         try {
@@ -432,129 +435,117 @@ public class EthereumBlockchainClient implements BlockchainClient {
         }
     }
 
-    /**
-     * ETH 전송을 수행합니다.
-     */
-    public String transferETH(String fromAddress, String toAddress, BigDecimal amount, BigInteger nonce) {
+    public BigInteger getProposalCount() {
         try {
-            log.info("Starting ETH transfer - From: {}, To: {}, Amount: {} ETH, Nonce: {}", 
-                fromAddress, toAddress, amount, nonce);
-            
-            // Admin 지갑 Credentials 생성
-            Credentials credentials = Credentials.create(adminPrivateKey);
-            
-            // Gas price 조회
-            BigInteger gasPrice = new BigInteger(getGasPrice());
-            BigInteger gasLimit = BigInteger.valueOf(21000); // ETH 전송 기본 가스 한도
-            
-            // 전송 금액을 Wei로 변환
-            BigInteger amountInWei = amount.multiply(BigDecimal.valueOf(1e18)).toBigInteger();
-            
-            // RawTransaction 생성
-            RawTransaction rawTransaction = RawTransaction.createEtherTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                toAddress,
-                amountInWei
+            log.info("Calling proposalCount() function on governance contract: {}", BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS);
+
+            // 1. proposalCount() 함수 정의
+            Function function = new Function(
+                "proposalCount",                              // 함수명
+                Collections.emptyList(),                      // 입력 파라미터 없음
+                Arrays.asList(new org.web3j.abi.TypeReference<Uint256>() {})
             );
-            
-            // 트랜잭션 서명
-            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
-            String hexValue = Numeric.toHexString(signedMessage);
-            
-            // 트랜잭션 브로드캐스트
-            String transactionHash = broadcastTransaction(hexValue);
-            
-            log.info("ETH transfer completed - Hash: {}", transactionHash);
-            return transactionHash;
-            
+
+            // 2. 함수 호출 데이터 인코딩
+            String encodedFunction = FunctionEncoder.encode(function);
+            log.debug("Encoded function data: {}", encodedFunction);
+
+            // 3. eth_call RPC 요청 생성
+            EthereumRpcRequest request = EthereumRpcRequest.of(
+                "eth_call",
+                Arrays.asList(
+                    Map.of(
+                        "to", BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS,
+                        "data", encodedFunction
+                    ),
+                    "latest"
+                )
+            );
+
+            // 4. RPC 요청 전송
+            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(
+                rpcUrl,
+                request,
+                new TypeReference<EthereumRpcResponse<String>>() {}
+            );
+
+            // 5. 응답 확인
+            if (response.hasError()) {
+                log.error("Error calling proposalCount(): {}", response.getError().getMessage());
+                return BigInteger.ZERO;
+            }
+
+            // 6. 결과 확인
+            String result = response.getResult();
+            if (result == null || result.equals("0x")) {
+                log.warn("Empty result from proposalCount()");
+                return BigInteger.ZERO;
+            }
+
+            // 7. hex 결과를 BigInteger로 변환
+            BigInteger proposalCount = new BigInteger(result.substring(2), 16);
+            log.info("Successfully retrieved proposal count: {}", proposalCount);
+
+            return proposalCount;
+
         } catch (Exception e) {
-            log.error("ETH transfer failed", e);
-            throw new RuntimeException("ETH transfer failed: " + e.getMessage(), e);
+            log.error("Error calling proposalCount() function: {}", e.getMessage(), e);
+            return BigInteger.ZERO;
         }
     }
 
-    /**
-     * ERC20 토큰 전송을 수행합니다.
-     */
-    public String transferERC20Token(String fromAddress, String toAddress, String tokenAddress, BigDecimal amount, BigInteger nonce) {
+    @Override
+    public Long getBlockTimestamp(String blockNumber) {
         try {
-            log.info("Starting ERC20 transfer - From: {}, To: {}, Token: {}, Amount: {}, Nonce: {}", 
-                fromAddress, toAddress, tokenAddress, amount, nonce);
-            
-            // Admin 지갑 Credentials 생성
-            Credentials credentials = Credentials.create(adminPrivateKey);
-            
-            // Gas price 조회
-            BigInteger gasPrice = new BigInteger(getGasPrice());
-            BigInteger gasLimit = BigInteger.valueOf(100_000L); // ERC20 전송 가스 한도
-            
-            // ERC-20 transfer 함수 데이터 생성
-            BigInteger amountWei = amount.multiply(BigDecimal.valueOf(1e18)).toBigInteger();
-            String transferData = createERC20TransferData(toAddress, amountWei);
-            
-            // RawTransaction 생성
-            RawTransaction rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                tokenAddress, // 토큰 컨트랙트 주소
-                transferData
-            );
-            
-            // 트랜잭션 서명
-            byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credentials);
-            String hexValue = Numeric.toHexString(signedMessage);
-            
-            // 트랜잭션 브로드캐스트
-            String transactionHash = broadcastTransaction(hexValue);
-            
-            log.info("ERC20 transfer completed - Hash: {}", transactionHash);
-            return transactionHash;
-            
-        } catch (Exception e) {
-            log.error("ERC20 transfer failed", e);
-            throw new RuntimeException("ERC20 transfer failed: " + e.getMessage(), e);
-        }
-    }
+            // blockNumber가 null이면 "latest" 사용
+            String targetBlock = (blockNumber != null) ? blockNumber : "latest";
+            log.info("Getting block timestamp for block: {}", targetBlock);
 
-    /**
-     * ERC-20 transfer 함수 데이터 생성
-     */
-    private String createERC20TransferData(String toAddress, BigInteger amount) {
-        try {
-            // ERC-20 transfer 함수 selector: transfer(address,uint256)
-            String functionSelector = "0xa9059cbb";
-            
-            // toAddress (20 bytes, padded to 32 bytes)
-            String paddedToAddress = "000000000000000000000000" + toAddress.substring(2);
-            
-            // amount (32 bytes, padded)
-            String paddedAmount = String.format("%064x", amount);
-            
-            String data = functionSelector + paddedToAddress + paddedAmount;
-            log.info("Created ERC-20 transfer data: {}", data);
-            
-            return data;
+            // eth_getBlockByNumber RPC 요청 생성
+            EthereumRpcRequest request = EthereumRpcRequest.of(
+                "eth_getBlockByNumber",
+                Arrays.asList(targetBlock, false) // false: 전체 블록 정보가 아닌 기본 정보만
+            );
+
+            // RPC 요청 전송
+            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(
+                rpcUrl,
+                request,
+                new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {}
+            );
+
+            // 응답 확인
+            if (response.hasError()) {
+                log.error("Error getting block timestamp: {}", response.getError().getMessage());
+                return null;
+            }
+
+            Map<String, Object> blockInfo = response.getResult();
+            if (blockInfo == null) {
+                log.error("Received null block info from Ethereum RPC");
+                return null;
+            }
+
+            // timestamp 필드 추출 (hex 문자열)
+            String timestampHex = (String) blockInfo.get("timestamp");
+            if (timestampHex == null) {
+                log.error("Block info does not contain timestamp field");
+                return null;
+            }
+
+            // hex를 Long으로 변환
+            Long timestamp = Long.parseLong(timestampHex.substring(2), 16);
+            log.info("Successfully retrieved block timestamp: {} for block: {}", timestamp, targetBlock);
+
+            return timestamp;
+
         } catch (Exception e) {
-            log.error("Error creating ERC-20 transfer data", e);
-            throw new RuntimeException("Failed to create ERC-20 transfer data", e);
+            log.error("Error getting block timestamp for block {}: {}", blockNumber, e.getMessage(), e);
+            return null;
         }
     }
 
     private String padLeft(String value, int length) {
         return String.format("%" + length + "s", value).replace(' ', '0');
-    }
-    
-    private String encodeString(String value) {
-        // 문자열을 ABI 인코딩 (간단한 구현)
-        String hexValue = HexUtils.bytesToHex(value.getBytes());
-        String length = padLeft(Integer.toHexString(value.length()), 64);
-        return length + padRight(hexValue, 64);
-    }
-    
-    private String padRight(String value, int length) {
-        return String.format("%-" + length + "s", value).replace(' ', '0');
     }
 } 

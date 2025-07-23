@@ -182,8 +182,10 @@ if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
     # 제안 정보 설정
     PROPOSAL_TITLE="ERC20 토큰 전송 테스트 제안"
     PROPOSAL_DESCRIPTION="이 제안은 ERC20 토큰 전송 테스트의 일환으로 생성되었습니다. 트랜잭션 해시: $TXHASH"
-    VOTING_START_DATE=$(date -v+1d +%Y-%m-%dT%H:%M:%S)
+    export TZ=America/New_York
+    VOTING_START_DATE=$(date +%Y-%m-%dT%H:%M:%S)
     VOTING_END_DATE=$(date -v+7d +%Y-%m-%dT%H:%M:%S)
+
     REQUIRED_QUORUM=100
     PROPOSAL_FEE=10.00
 
@@ -198,72 +200,68 @@ if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
     log_info "  위임자: $WALLET_ADDRESS"
     log_info "  위임받는자: $WALLET_ADDRESS (자기 자신에게 위임)"
 
-    # 위임 API 호출
-    DELEGATION_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/delegate" \
+
+    log_info "8️⃣-1️⃣ 1단계: 거버넌스 제안 저장 중..."
+
+    SAVE_PROPOSAL_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/save" \
         -H "Content-Type: application/json" \
         -d "{
-            \"delegatorWalletAddress\": \"$WALLET_ADDRESS\",
-            \"delegateeWalletAddress\": \"$WALLET_ADDRESS\",
+            \"creatorId\": \"$USER_ID\",
+            \"title\": \"$PROPOSAL_TITLE\",
+            \"description\": \"$PROPOSAL_DESCRIPTION\",
+            \"votingStartDate\": \"$VOTING_START_DATE\",
+            \"votingEndDate\": \"$VOTING_END_DATE\",
+            \"requiredQuorum\": $REQUIRED_QUORUM,
+            \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
+            \"proposalFee\": $PROPOSAL_FEE,
             \"networkType\": \"ETHEREUM\"
         }")
 
-    log_debug "위임 API 응답: $DELEGATION_RESPONSE"
+    # 제안 ID 추출
+    PROPOSAL_ID=$(echo $SAVE_PROPOSAL_RESPONSE | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
 
-    DELEGATION_SUCCESS=$(echo "$DELEGATION_RESPONSE" | grep -o '"success":true')
-
-    if [ -n "$DELEGATION_SUCCESS" ]; then
-        DELEGATION_TX_HASH=$(echo "$DELEGATION_RESPONSE" | grep -o '"delegationTransactionHash":"[^"]*"' | cut -d'"' -f4)
-        log_success "🎉 0단계: 투표권 위임 성공!"
-        log_info "  위임 트랜잭션 해시: $DELEGATION_TX_HASH"
-        log_info "  위임자: $WALLET_ADDRESS"
-        log_info "  위임받는자: $WALLET_ADDRESS"
-        
-        # 위임 트랜잭션 후 10초 대기
-        log_info "⏳ 위임 트랜잭션 후 10초 대기 중..."
-        sleep 10
-        log_success "✅ 대기 완료! 이제 거버넌스 제안을 생성할 수 있습니다."
+    if [ -n "$PROPOSAL_ID" ]; then
+        log_success "🎉 1단계: 거버넌스 제안 저장 성공!"
+        log_info "  제안 ID: $PROPOSAL_ID"
+        log_info "  제안자: $USERNAME"
+        log_info "  지갑 주소: $WALLET_ADDRESS"
     else
-        log_error "0단계: 투표권 위임 실패: $DELEGATION_RESPONSE"
-        log_warning "투표권 위임이 실패하여 거버넌스 제안 프로세스를 중단합니다"
-        DELEGATION_SUCCESS=""
+        log_error "1단계: 거버넌스 제안 저장 실패: $SAVE_PROPOSAL_RESPONSE"
+        log_warning "거버넌스 제안 프로세스를 중단합니다"
     fi
 
-    # 8-1. 1단계: 거버넌스 제안 저장 (위임이 성공한 경우에만)
-    if [ -n "$DELEGATION_SUCCESS" ]; then
-        log_info "8️⃣-1️⃣ 1단계: 거버넌스 제안 저장 중..."
+    # 8-2. 2단계: 수수료 충전 (제안 저장이 성공한 경우에만)
+    if [ -n "$PROPOSAL_ID" ]; then
+        log_info "8️⃣-2️⃣ 2단계: 수수료 충전 중..."
 
-        SAVE_PROPOSAL_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/save" \
+        CHARGE_FEE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/charge-fee" \
             -H "Content-Type: application/json" \
             -d "{
-                \"creatorId\": \"$USER_ID\",
-                \"title\": \"$PROPOSAL_TITLE\",
-                \"description\": \"$PROPOSAL_DESCRIPTION\",
-                \"votingStartDate\": \"$VOTING_START_DATE\",
-                \"votingEndDate\": \"$VOTING_END_DATE\",
-                \"requiredQuorum\": $REQUIRED_QUORUM,
                 \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
                 \"proposalFee\": $PROPOSAL_FEE,
                 \"networkType\": \"ETHEREUM\"
             }")
 
-        # 제안 ID 추출
-        PROPOSAL_ID=$(echo $SAVE_PROPOSAL_RESPONSE | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+        FEE_SUCCESS=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"success":true')
 
-        if [ -n "$PROPOSAL_ID" ]; then
-            log_success "🎉 1단계: 거버넌스 제안 저장 성공!"
-            log_info "  제안 ID: $PROPOSAL_ID"
-            log_info "  제안자: $USERNAME"
-            log_info "  지갑 주소: $WALLET_ADDRESS"
+        if [ -n "$FEE_SUCCESS" ]; then
+            FEE_TX_HASH=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"feeTransactionHash":"[^"]*"' | cut -d'"' -f4)
+            log_success "🎉 2단계: 수수료 충전 성공!"
+            log_info "  수수료 트랜잭션 해시: $FEE_TX_HASH"
+            log_info "  충전된 수수료: $PROPOSAL_FEE"
         else
-            log_error "1단계: 거버넌스 제안 저장 실패: $SAVE_PROPOSAL_RESPONSE"
-            log_warning "거버넌스 제안 프로세스를 중단합니다"
+            log_error "2단계: 수수료 충전 실패: $CHARGE_FEE_RESPONSE"
+            log_warning "블록체인 브로드캐스트를 건너뜁니다"
         fi
 
-        # 8-2. 2단계: 수수료 충전 (제안 저장이 성공한 경우에만)
-        if [ -n "$PROPOSAL_ID" ]; then
-            log_info "8️⃣-2️⃣ 2단계: 수수료 충전 중..."
+        sleep 30
+        log_info "8️⃣-3️⃣ 3단계전 : 수수료 입금 확인 진행중 ... "
 
-            CHARGE_FEE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/charge-fee" \
+        # 8-3. 3단계: 블록체인 브로드캐스트 (수수료 충전이 성공한 경우에만)
+        if [ -n "$FEE_SUCCESS" ]; then
+            log_info "8️⃣-3️⃣ 3단계: 블록체인 브로드캐스트 중..."
+
+            BROADCAST_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/broadcast" \
                 -H "Content-Type: application/json" \
                 -d "{
                     \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
@@ -271,44 +269,16 @@ if [ -n "$TXHASH" ] && [ "$TXHASH" != "null" ]; then
                     \"networkType\": \"ETHEREUM\"
                 }")
 
-            FEE_SUCCESS=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"success":true')
+            BROADCAST_SUCCESS=$(echo "$BROADCAST_RESPONSE" | grep -o '"success":true')
 
-            if [ -n "$FEE_SUCCESS" ]; then
-                FEE_TX_HASH=$(echo "$CHARGE_FEE_RESPONSE" | grep -o '"feeTransactionHash":"[^"]*"' | cut -d'"' -f4)
-                log_success "🎉 2단계: 수수료 충전 성공!"
-                log_info "  수수료 트랜잭션 해시: $FEE_TX_HASH"
-                log_info "  충전된 수수료: $PROPOSAL_FEE"
+            if [ -n "$BROADCAST_SUCCESS" ]; then
+                GOVERNANCE_TX_HASH=$(echo "$BROADCAST_RESPONSE" | grep -o '"governanceTransactionHash":"[^"]*"' | cut -d'"' -f4)
+                log_success "🎉 3단계: 블록체인 브로드캐스트 성공!"
+                log_info "  거버넌스 트랜잭션 해시: $GOVERNANCE_TX_HASH"
+                log_info "  사용된 수수료: $PROPOSAL_FEE"
+                log_success "🚀 거버넌스 제안이 실제 블록체인에 등록되었습니다!"
             else
-                log_error "2단계: 수수료 충전 실패: $CHARGE_FEE_RESPONSE"
-                log_warning "블록체인 브로드캐스트를 건너뜁니다"
-            fi
-
-            sleep 30
-            log_info "8️⃣-3️⃣ 3단계전 : 수수료 입금 확인 진행중 ... "
-
-            # 8-3. 3단계: 블록체인 브로드캐스트 (수수료 충전이 성공한 경우에만)
-            if [ -n "$FEE_SUCCESS" ]; then
-                log_info "8️⃣-3️⃣ 3단계: 블록체인 브로드캐스트 중..."
-
-                BROADCAST_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/$PROPOSAL_ID/broadcast" \
-                    -H "Content-Type: application/json" \
-                    -d "{
-                        \"creatorWalletAddress\": \"$WALLET_ADDRESS\",
-                        \"proposalFee\": $PROPOSAL_FEE,
-                        \"networkType\": \"ETHEREUM\"
-                    }")
-
-                BROADCAST_SUCCESS=$(echo "$BROADCAST_RESPONSE" | grep -o '"success":true')
-
-                if [ -n "$BROADCAST_SUCCESS" ]; then
-                    GOVERNANCE_TX_HASH=$(echo "$BROADCAST_RESPONSE" | grep -o '"governanceTransactionHash":"[^"]*"' | cut -d'"' -f4)
-                    log_success "🎉 3단계: 블록체인 브로드캐스트 성공!"
-                    log_info "  거버넌스 트랜잭션 해시: $GOVERNANCE_TX_HASH"
-                    log_info "  사용된 수수료: $PROPOSAL_FEE"
-                    log_success "🚀 거버넌스 제안이 실제 블록체인에 등록되었습니다!"
-                else
-                    log_error "3단계: 블록체인 브로드캐스트 실패: $BROADCAST_RESPONSE"
-                fi
+                log_error "3단계: 블록체인 브로드캐스트 실패: $BROADCAST_RESPONSE"
             fi
         fi
     fi

@@ -31,7 +31,8 @@ public class ExchangeApplicationService {
     private final TokenAccountApplicationService tokenAccountApplicationService;
     private final TransactionOrchestrator transactionOrchestrator;
     private final TokenAccountRepository tokenAccountRepository;
-    
+    private final AdminWalletService adminWalletService;
+
     // 포인트 → 토큰 교환 비율 (1 포인트 = 0.01 토큰)
     private static final BigDecimal EXCHANGE_RATE = new BigDecimal("0.01");
     
@@ -179,7 +180,7 @@ public class ExchangeApplicationService {
      */
     private String executeTokenTransfer(ExchangeRequest exchangeRequest) {
         NetworkType networkType = determineNetworkType(exchangeRequest.getWalletAddress());
-        AdminWalletService.AdminWalletInfo adminWallet = getAdminWallet(networkType);
+        AdminWalletService.AdminWalletInfo adminWallet = adminWalletService.getAdminWallet(networkType);
         String tokenContract = getTokenContractAddress(networkType);
         BigDecimal tokenAmount = calculateTokenAmount(exchangeRequest);
         
@@ -200,18 +201,7 @@ public class ExchangeApplicationService {
         
         return transactionHash;
     }
-    
-    /**
-     * Admin 지갑 정보 조회
-     */
-    private AdminWalletService.AdminWalletInfo getAdminWallet(NetworkType networkType) {
-        AdminWalletService.AdminWalletInfo adminWallet = AdminWalletService.getAdminWallet(networkType);
-        if (adminWallet == null) {
-            throw new RuntimeException("Admin wallet not found for network: " + networkType);
-        }
-        return adminWallet;
-    }
-    
+
     /**
      * 토큰 양 계산
      */

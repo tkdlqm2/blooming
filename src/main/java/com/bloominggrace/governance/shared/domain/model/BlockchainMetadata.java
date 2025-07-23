@@ -9,11 +9,12 @@ import java.math.BigInteger;
  * 패키지 전역에서 static으로 접근 가능
  */
 public class BlockchainMetadata {
-    
     // ===== 이더리움 메타데이터 =====
     public static class Ethereum {
         // ERC20 토큰 컨트랙트 주소
-        public static final String ERC20_CONTRACT_ADDRESS = "0xeafF00556BC06464511319dAb26D6CAC148b89d0";
+        // 이전 erc20
+        // public static final String ERC20_CONTRACT_ADDRESS = "0xeafF00556BC06464511319dAb26D6CAC148b89d0";
+        public static final String ERC20_CONTRACT_ADDRESS = "0xd2Dfe16C1F31493530D297D58E32c337fd27615D";
         public static final String ERC20_SYMBOL = "ETH";
         public static final int ERC20_DECIMALS = 18;
         
@@ -21,6 +22,7 @@ public class BlockchainMetadata {
         public static final String ADMIN_WALLET_ADDRESS = "0x55D5c49e36f8A89111687C9DC8355121068f0cD8";
 
         // 기본 가스 설정 (현재 네트워크 최적화)
+        public static final BigInteger TRANSFER_DELEGATE_GAS_LIMIT = BigInteger.valueOf(300_000L);  // 20→15 Gwei 절약
         public static final BigInteger GAS_PRICE = BigInteger.valueOf(10_000_000_000L);  // 20→15 Gwei 절약
         public static final BigInteger GAS_LIMIT = BigInteger.valueOf(150_000L);         // 200k→150k 최적화
 
@@ -40,7 +42,8 @@ public class BlockchainMetadata {
         public static final long CHAIN_ID = 11155111L;
 
         // 컨트랙트 설정
-        public static final String GOVERNANCE_CONTRACT_ADDRESS = "0xA8B86ecf2d57F7b53312Ae5ecb3215C698550Afd";
+        // public static final String GOVERNANCE_CONTRACT_ADDRESS = "0xA8B86ecf2d57F7b53312Ae5ecb3215C698550Afd";
+        public static final String GOVERNANCE_CONTRACT_ADDRESS = "0x4E5EE91796498E843a7Ae952BC86B1a1547C60bB";
     }
     
     // ===== 솔라나 메타데이터 =====

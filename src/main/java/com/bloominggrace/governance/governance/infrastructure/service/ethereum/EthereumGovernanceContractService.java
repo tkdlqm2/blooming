@@ -33,14 +33,6 @@ public class EthereumGovernanceContractService implements BlockchainGovernanceSe
     
     @Value("${blockchain.ethereum.governance-contract}")
     private String governanceContractAddress;
-    
-    @Value("${blockchain.ethereum.token-contract}")
-    private String tokenContractAddress;
-    
-    @Value("${blockchain.ethereum.rpc-url}")
-    private String ethereumRpcUrl;
-    
-    private final EthereumRawTransactionBuilder rawTransactionBuilder;
 
     // Function selectors (keccak256의 첫 4바이트)
     // 실제 거버넌스 컨트랙트의 propose() 함수 시그니처
@@ -66,26 +58,7 @@ public class EthereumGovernanceContractService implements BlockchainGovernanceSe
         }
         return address;
     }
-    
-    /**
-     * 설정에서 Ethereum 토큰 컨트랙트 주소를 가져옴
-     */
-    private String getTokenContractAddress() {
-        String address = tokenContractAddress;
-        if (address == null || address.equals("0x0000000000000000000000000000000000000000")) {
-            log.warn("Token contract address not configured, using default");
-            return "0x0000000000000000000000000000000000000000";
-        }
-        return address;
-    }
-    
-    /**
-     * 설정에서 Ethereum RPC URL을 가져옴
-     */
-    private String getEthereumRpcUrl() {
-        return ethereumRpcUrl;
-    }
-    
+
     @Override
     public NetworkType getSupportedNetworkType() {
         return NetworkType.ETHEREUM;

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -251,6 +252,16 @@ public class SolanaBlockchainClient implements BlockchainClient {
     @Override
     public String calculateTransactionFee(String gasPrice, String gasLimit) {
         return "5000"; // 고정 수수료
+    }
+
+    @Override
+    public BigInteger getProposalCount() {
+        return null;
+    }
+
+    @Override
+    public Long getBlockTimestamp(String blockNumber) {
+        return 0L;
     }
 
     @Override

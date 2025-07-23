@@ -44,39 +44,4 @@ public class BlockchainClientFactory {
         }
         return client;
     }
-    
-    /**
-     * 네트워크 타입 문자열에 따라 적절한 BlockchainClient를 반환합니다.
-     * 
-     * @param networkType 네트워크 타입 문자열
-     * @return 해당 네트워크의 BlockchainClient
-     * @throws IllegalArgumentException 지원하지 않는 네트워크 타입인 경우
-     */
-    public BlockchainClient getClient(String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            return getClient(type);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Unsupported network type: " + networkType);
-        }
-    }
-    
-    /**
-     * 지원하는 모든 네트워크 타입을 반환합니다.
-     * 
-     * @return 지원하는 네트워크 타입들의 Set
-     */
-    public java.util.Set<NetworkType> getSupportedNetworkTypes() {
-        return blockchainClients.keySet();
-    }
-    
-    /**
-     * 특정 네트워크 타입이 지원되는지 확인합니다.
-     * 
-     * @param networkType 확인할 네트워크 타입
-     * @return 지원 여부
-     */
-    public boolean isSupported(NetworkType networkType) {
-        return blockchainClients.containsKey(networkType);
-    }
 } 

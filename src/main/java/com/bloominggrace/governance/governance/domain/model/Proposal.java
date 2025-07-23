@@ -8,6 +8,7 @@ import com.bloominggrace.governance.governance.domain.event.ProposalVotingEndedE
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.math.BigInteger;
 
 @Entity
 @Table(name = "proposals")
@@ -50,6 +51,17 @@ public class Proposal extends AggregateRoot {
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    // 새로 추가: 트랜잭션 해시 필드
+    @Column(name = "tx_hash")
+    private String txHash;
+    
+    // 새로 추가: 블록체인 제안 개수 필드
+    @Column(name = "proposal_count")
+    private BigInteger proposalCount;
+    
+    @Column(name = "creator_wallet_address")
+    private String creatorWalletAddress;
 
     protected Proposal() {}
 
@@ -65,12 +77,13 @@ public class Proposal extends AggregateRoot {
         this.description = description;
         this.status = ProposalStatus.DRAFT;
         this.votingPeriod = votingPeriod;
+        this.voteResults = new VoteResults();
         this.requiredQuorum = requiredQuorum;
-        this.voteResults = new VoteResults(0, 0, 0, 0);
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        
-        addDomainEvent(new ProposalCreatedEvent(id, creatorId, title));
+        this.txHash = null;
+        this.proposalCount = null;
+        this.creatorWalletAddress = null;
     }
 
     public ProposalId getId() {
@@ -111,6 +124,18 @@ public class Proposal extends AggregateRoot {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getTxHash() {
+        return txHash;
+    }
+
+    public BigInteger getProposalCount() {
+        return proposalCount;
+    }
+
+    public String getCreatorWalletAddress() {
+        return creatorWalletAddress;
     }
 
     public void activate() {
@@ -204,6 +229,11 @@ public class Proposal extends AggregateRoot {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void updateVotingPeriod(VotingPeriod newVotingPeriod) {
+        this.votingPeriod = newVotingPeriod;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public boolean canVote() {
         return this.status == ProposalStatus.VOTING && votingPeriod.isVotingActive();
     }
@@ -218,6 +248,30 @@ public class Proposal extends AggregateRoot {
 
     public boolean isRejected() {
         return this.status == ProposalStatus.REJECTED;
+    }
+
+    /**
+     * 트랜잭션 해시 설정
+     */
+    public void setTxHash(String txHash) {
+        this.txHash = txHash;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 블록체인 제안 개수 설정
+     */
+    public void setProposalCount(BigInteger proposalCount) {
+        this.proposalCount = proposalCount;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 제안자 지갑 주소 설정
+     */
+    public void setCreatorWalletAddress(String creatorWalletAddress) {
+        this.creatorWalletAddress = creatorWalletAddress;
+        this.updatedAt = LocalDateTime.now();
     }
 
     @Override

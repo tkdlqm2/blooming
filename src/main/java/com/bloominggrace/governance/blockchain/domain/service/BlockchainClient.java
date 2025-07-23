@@ -3,6 +3,8 @@ package com.bloominggrace.governance.blockchain.domain.service;
 import com.bloominggrace.governance.shared.domain.model.TransactionBody;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 
+import java.math.BigInteger;
+
 /**
  * 블록체인 네트워크와의 통신을 담당하는 인터페이스
  * 각 네트워크별로 구현체가 필요합니다.
@@ -116,6 +118,7 @@ public interface BlockchainClient {
      */
     String getLatestBlockNumber();
     
+
     /**
      * 트랜잭션 수수료를 계산합니다.
      * @param gasPrice 가스 가격
@@ -123,4 +126,13 @@ public interface BlockchainClient {
      * @return 트랜잭션 수수료
      */
     String calculateTransactionFee(String gasPrice, String gasLimit);
+
+    BigInteger getProposalCount();
+    
+    /**
+     * 블록의 타임스탬프를 조회합니다.
+     * @param blockNumber 블록 번호 (null이면 최신 블록)
+     * @return 블록 타임스탬프 (Unix timestamp)
+     */
+    Long getBlockTimestamp(String blockNumber);
 } 

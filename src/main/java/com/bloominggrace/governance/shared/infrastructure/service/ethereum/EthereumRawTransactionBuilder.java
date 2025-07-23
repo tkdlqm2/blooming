@@ -1,5 +1,6 @@
 package com.bloominggrace.governance.shared.infrastructure.service.ethereum;
 
+import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.EthereumBlockchainClient;
 import com.bloominggrace.governance.shared.domain.service.RawTransactionBuilder;
 import com.bloominggrace.governance.blockchain.application.service.BlockchainClientFactory;
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -28,8 +30,6 @@ import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.TypeReference;
-import org.web3j.crypto.RawTransaction;
-import org.web3j.utils.Numeric;
 
 /**
  * 이더리움 네트워크용 RawTransaction 생성기
@@ -40,6 +40,9 @@ import org.web3j.utils.Numeric;
 public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
 
     private final BlockchainClientFactory blockchainClientFactory;
+
+    // 블록 생성 평균 시간 (초) — Ethereum 메인넷 기준
+    private static final long BLOCK_TIME_SECONDS = 12;
 
     /**
      * 통합 RawTransaction 생성 메서드
@@ -115,18 +118,51 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
                 log.info("[EthereumRawTransactionBuilder] Got nonce for {}: {}", walletAddress, nonce);
             }
 
-            // 2. 거버넌스 컨트랙트 주소 가져오기
+            // 2. 현재 블록 정보 가져오기
+            BlockchainClient blockchainClient = blockchainClientFactory.getClient(NetworkType.ETHEREUM);
+            BigInteger currentBlock = new BigInteger(blockchainClient.getLatestBlockNumber());
+            Long currentBlockTimestamp = blockchainClient.getBlockTimestamp(null); // null = latest block
+
+            if (currentBlockTimestamp == null) {
+                throw new RuntimeException("Failed to get current block timestamp");
+            }
+
+            long currentTimestamp = currentBlockTimestamp;
+            log.info("[EthereumRawTransactionBuilder] Current block: {}, Current timestamp: {}", currentBlock, currentTimestamp);
+
+            // 3. 투표 시작/종료 시간 설정 (LocalDateTime → epoch seconds)
+            long votingStartTimestamp = votingStartDate.toEpochSecond(ZoneOffset.UTC);
+            long votingEndTimestamp = votingEndDate.toEpochSecond(ZoneOffset.UTC);
+
+            // 🔧 디버깅 로그 추가
+            log.info("=== 시간 변환 디버깅 ===");
+            log.info("votingStartDate: {}", votingStartDate);
+            log.info("votingEndDate: {}", votingEndDate);
+            log.info("votingStartTimestamp: {} ({})", votingStartTimestamp, java.time.Instant.ofEpochSecond(votingStartTimestamp));
+            log.info("votingEndTimestamp: {} ({})", votingEndTimestamp, java.time.Instant.ofEpochSecond(votingEndTimestamp));
+            log.info("currentTimestamp: {} ({})", currentTimestamp, java.time.Instant.ofEpochSecond(currentTimestamp));
+
+            // 4. epoch seconds → 블록 번호 변환
+            BigInteger startBlock = convertDateTimeToBlock(votingStartTimestamp, currentTimestamp, currentBlock);
+            BigInteger endBlock = startBlock.add(BigInteger.valueOf(50500));
+
+            log.info("=== 블록 변환 결과 ===");
+            log.info("Start block: {}", startBlock);
+            log.info("End block: {}", endBlock);
+            log.info("Voting duration in blocks: {}", endBlock.subtract(startBlock));
+
+            // 5. 거버넌스 컨트랙트 주소 가져오기
             String governanceContractAddress = BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS;
 
-            // 3. 실제 거버넌스 컨트랙트의 propose() 함수 데이터 생성
-            String functionData = createProposeFunctionData(title, description);
+            // 6. 실제 거버넌스 컨트랙트의 propose() 함수 데이터 생성 (블록 번호 포함)
+            String functionData = createProposeFunctionData(title, description, startBlock.add(BigInteger.valueOf(6)), endBlock);
 
-            // 4. RawTransaction 생성
+            // 7. RawTransaction 생성
             BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
             BigInteger gasLimit = BlockchainMetadata.Ethereum.PROPOSAL_CREATION_GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // propose() 함수는 value가 0
 
-            // 5. RawTransaction을 JSON 형태로 반환 (기존 인터페이스 유지)
+            // 8. RawTransaction을 JSON 형태로 반환 (기존 인터페이스 유지)
             String rawTransactionJson = String.format(
                     "{\"fromAddress\":\"%s\",\"toAddress\":\"%s\",\"data\":\"%s\",\"value\":\"%s\",\"nonce\":\"%s\",\"gasPrice\":\"%s\",\"gasLimit\":\"%s\"}",
                     walletAddress, governanceContractAddress, functionData, value.toString(), nonce, gasPrice.toString(), gasLimit.toString()
@@ -141,8 +177,10 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
         }
     }
 
+
     @Override
     public String createVoteRawTransaction(
+            BigInteger proposalCount,
             UUID proposalId,
             String walletAddress,
             String voteType,
@@ -165,10 +203,9 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
             String governanceContractAddress = BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS;
 
             // 3. 투표 함수 데이터 생성 (vote 함수 호출)
-            String functionData = createVoteFunctionData(proposalId, voteType, reason, votingPower);
+            String functionData = createVoteFunctionData(proposalCount, voteType);
 
             // 4. RawTransaction 생성
-            BigInteger nonceBigInt = new BigInteger(nonce);
             BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
             BigInteger gasLimit = BlockchainMetadata.Ethereum.VOTE_GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // 투표는 value가 0
@@ -237,80 +274,14 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
         }
     }
 
-
-    /**
-     * Web3j를 사용한 ERC-20 transfer 함수 데이터 생성
-     */
-    private String createERC20TransferFunctionDataWithWeb3j(String toAddress, BigDecimal amount) {
-        try {
-            // ERC-20 transfer 함수 시그니처: transfer(address,uint256)
-            BigInteger amountWei = amount.multiply(BigDecimal.valueOf(1e18)).toBigInteger();
-
-            Function transferFunction = new Function(
-                    "transfer",
-                    Arrays.asList(
-                            new Address(toAddress),
-                            new Uint256(amountWei)
-                    ),
-                    Collections.emptyList()
-            );
-
-            return FunctionEncoder.encode(transferFunction);
-        } catch (Exception e) {
-            log.error("[EthereumRawTransactionBuilder] Failed to create ERC-20 transfer function data", e);
-            throw new RuntimeException("Failed to create ERC-20 transfer function data: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 제안 생성 함수 데이터 생성 (사용되지 않는 메서드 - 호환성을 위해 유지)
-     */
-    private String createProposalCreationFunctionData(
-            UUID proposalId,
-            String title,
-            String description,
-            BigDecimal proposalFee,
-            LocalDateTime votingStartDate,
-            LocalDateTime votingEndDate,
-            BigDecimal requiredQuorum
-    ) {
-        try {
-            // createProposal 함수 시그니처: createProposal(string title, string description, uint256 proposalFee, uint256 votingStart, uint256 votingEnd, uint256 requiredQuorum)
-            long votingStartTimestamp = votingStartDate.toEpochSecond(ZoneOffset.UTC);
-            long votingEndTimestamp = votingEndDate.toEpochSecond(ZoneOffset.UTC);
-
-            Function createProposalFunction = new Function(
-                    "createProposal",
-                    Arrays.asList(
-                            new Utf8String(title),
-                            new Utf8String(description),
-                            new Uint256(proposalFee.multiply(BigDecimal.valueOf(1e18)).toBigInteger()),
-                            new Uint256(BigInteger.valueOf(votingStartTimestamp)),
-                            new Uint256(BigInteger.valueOf(votingEndTimestamp)),
-                            new Uint256(requiredQuorum.multiply(BigDecimal.valueOf(1e18)).toBigInteger())
-                    ),
-                    Arrays.asList(new TypeReference<Uint256>() {})
-            );
-
-            return FunctionEncoder.encode(createProposalFunction);
-        } catch (Exception e) {
-            log.error("[EthereumRawTransactionBuilder] Failed to create proposal creation function data", e);
-            throw new RuntimeException("Failed to create proposal creation function data: " + e.getMessage(), e);
-        }
-    }
-
     /**
      * 투표 함수 데이터 생성
      */
     private String createVoteFunctionData(
-            UUID proposalId,
-            String voteType,
-            String reason,
-            BigDecimal votingPower
+            BigInteger proposalCount,
+            String voteType
     ) {
         try {
-            // vote 함수 시그니처: vote(uint256 proposalId, uint8 voteType, string reason, uint256 votingPower)
-
             // voteType을 숫자로 변환 (0: AGAINST, 1: FOR, 2: ABSTAIN)
             int voteTypeNumber;
             switch (voteType.toUpperCase()) {
@@ -329,60 +300,20 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
                     voteTypeNumber = 0;
             }
 
-            // UUID를 BigInteger로 안전하게 변환
-            BigInteger proposalIdBigInt = new BigInteger(proposalId.toString().replaceAll("-", ""), 16);
-
             Function voteFunction = new Function(
                     "vote",
                     Arrays.asList(
-                            new Uint256(proposalIdBigInt),
-                            new Uint8(BigInteger.valueOf(voteTypeNumber)),
-                            new Utf8String(reason != null ? reason : ""),
-                            new Uint256(votingPower.multiply(BigDecimal.valueOf(1e18)).toBigInteger())
+                            new Uint256(proposalCount),
+                            new Uint8(BigInteger.valueOf(voteTypeNumber))
                     ),
                     Collections.emptyList()
             );
 
             return FunctionEncoder.encode(voteFunction);
+
         } catch (Exception e) {
             log.error("[EthereumRawTransactionBuilder] Failed to create vote function data", e);
             throw new RuntimeException("Failed to create vote function data: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * 실제 거버넌스 컨트랙트의 propose() 함수 데이터 생성
-     * propose(string memory description, string memory details)
-     */
-    private String createProposeFunctionData(String title, String description) {
-        try {
-            // ✅ 1단계: Web3j로 파라미터만 인코딩
-            Function tempFunction = new Function(
-                    "tempFunction", // 임시 이름 (어떤 이름이든 상관없음)
-                    Arrays.asList(
-                            new Utf8String(title),
-                            new Utf8String(description)
-                    ),
-                    Arrays.asList(new TypeReference<Uint256>() {})
-            );
-
-            String encoded = FunctionEncoder.encode(tempFunction);
-            String parameters = encoded.substring(10); // 시그니처 제외한 파라미터만
-
-            // ✅ 2단계: 올바른 시그니처(0x1c4afc57)와 결합
-            String correctSelector = "0x1c4afc57"; // ABI에서 확인된 createProposal 시그니처
-            String finalData = correctSelector + parameters;
-
-            log.info("=== 함수 데이터 생성 완료 ===");
-            log.info("올바른 시그니처 사용: {}", correctSelector);
-            log.info("최종 데이터: {}", finalData);
-            log.info("Title: '{}', Description: '{}'", title, description);
-
-            return finalData;
-
-        } catch (Exception e) {
-            log.error("Failed to create function data", e);
-            throw new RuntimeException("Failed to create function data: " + e.getMessage(), e);
         }
     }
 
@@ -496,7 +427,7 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
     private String createERC20TransferFunctionData(String toAddress, BigDecimal amount) {
         try {
             // ERC-20 transfer(address,uint256) 함수 시그니처: 0xa9059cbb
-            String methodSignature = "0xa9059cbb";
+            String methodSignature = "0xc2c1a19c";
 
             // 주소 패딩 (32바이트, 64글자)
             String cleanAddress = toAddress.startsWith("0x") ? toAddress.substring(2) : toAddress;
@@ -521,7 +452,7 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
      * 가스 추정 및 설정
      */
     private GasConfig estimateAndConfigureGas(TransactionParams params, TransactionData txData, TransactionType txType) {
-        BigInteger gasPrice = resolveGasPrice(params.getGasPrice());
+        BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
         BigInteger gasLimit = resolveGasLimit(params, txData, txType);
 
         return GasConfig.builder()
@@ -546,60 +477,13 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
      * 가스 한도 결정
      */
     private BigInteger resolveGasLimit(TransactionParams params, TransactionData txData, TransactionType txType) {
-        if (params.getGasLimit() != null && !params.getGasLimit().trim().isEmpty()) {
-            return new BigInteger(params.getGasLimit().trim());
-        }
-
-        // 가스 추정 시도
-        BigInteger estimatedGas = estimateGasFromNetwork(params.getFromAddress(), txData);
-        if (estimatedGas != null) {
-            // 20% 버퍼 추가
-            BigInteger gasWithBuffer = estimatedGas
-                    .multiply(BigInteger.valueOf(120L))
-                    .divide(BigInteger.valueOf(100L));
-
-            log.info("[EthereumRawTransactionBuilder] Estimated gas: {}, Using with buffer: {}",
-                    estimatedGas, gasWithBuffer);
-            return gasWithBuffer;
-        }
-
-        // 기본값 사용
-        BigInteger defaultGasLimit = getDefaultGasLimit(txType);
-        log.info("[EthereumRawTransactionBuilder] Using default gas limit for {}: {}", txType, defaultGasLimit);
-        return defaultGasLimit;
-    }
-
-    /**
-     * 네트워크에서 가스 추정
-     */
-    private BigInteger estimateGasFromNetwork(String fromAddress, TransactionData txData) {
-        try {
-            BlockchainClient blockchainClient = blockchainClientFactory.getClient(NetworkType.ETHEREUM);
-            String estimatedGas = blockchainClient.estimateGas(fromAddress, txData.getToAddress(), txData.getData());
-
-            if (estimatedGas != null && !estimatedGas.isEmpty()) {
-                return new BigInteger(estimatedGas);
-            }
-        } catch (Exception e) {
-            log.warn("[EthereumRawTransactionBuilder] Failed to estimate gas from network: {}", e.getMessage());
-        }
-
-        return null;
-    }
-
-    /**
-     * 트랜잭션 타입별 기본 가스 한도
-     */
-    private BigInteger getDefaultGasLimit(TransactionType txType) {
-        switch (txType) {
-            case ETH_TRANSFER:
-                return BlockchainMetadata.Ethereum.GAS_PRICE; // 21,000
-            case ERC20_TRANSFER:
-                return BlockchainMetadata.Ethereum.ERC20_TRANSFER_GAS_LIMIT; // 100,000
-            default:
-                return BigInteger.valueOf(21_000L);
+        if(txType == TransactionType.ERC20_TRANSFER) {
+            return BlockchainMetadata.Ethereum.TRANSFER_DELEGATE_GAS_LIMIT;
+        } else {
+            return BlockchainMetadata.Ethereum.GAS_LIMIT;
         }
     }
+
 
     /**
      * 최종 RawTransaction JSON 생성
@@ -651,6 +535,79 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
         }
     }
 
+    /**
+     * 시간을 블록 번호로 변환
+     */
+    private static BigInteger convertDateTimeToBlock(long targetTimestamp, long currentTimestamp, BigInteger currentBlock) {
+        // 🔧 BLOCK_TIME_SECONDS 상수 확인 필요!
+        final long BLOCK_TIME_SECONDS = 12L; // 이더리움 평균 블록 시간 (12초)
+
+        // 🔍 디버깅 로그
+        log.info("=== convertDateTimeToBlock Debug ===");
+        log.info("targetTimestamp: {} ({})", targetTimestamp, java.time.Instant.ofEpochSecond(targetTimestamp));
+        log.info("currentTimestamp: {} ({})", currentTimestamp, java.time.Instant.ofEpochSecond(currentTimestamp));
+        log.info("currentBlock: {}", currentBlock);
+        log.info("BLOCK_TIME_SECONDS: {}", BLOCK_TIME_SECONDS);
+
+        long timeDiff = targetTimestamp - currentTimestamp;
+        log.info("timeDiff: {} seconds ({} days)", timeDiff, timeDiff / 86400.0);
+
+        long blockDiff = timeDiff / BLOCK_TIME_SECONDS;
+        log.info("blockDiff: {}", blockDiff);
+
+        if (blockDiff < 0) {
+            log.warn("Target time is in the past! Setting blockDiff to 0");
+            blockDiff = 0; // 과거 시간 방지
+        }
+
+        BigInteger result = currentBlock.add(BigInteger.valueOf(blockDiff));
+        log.info("result block: {}", result);
+
+        // 🚨 비정상적인 결과 경고
+        double estimatedDays = Math.abs(blockDiff * BLOCK_TIME_SECONDS) / 86400.0;
+        if (estimatedDays > 365) {
+            log.error("⚠️ ABNORMAL RESULT: {} blocks = {} days", blockDiff, estimatedDays);
+            log.error("Check BLOCK_TIME_SECONDS constant!");
+        }
+
+        return result;
+    }
+
+    /**
+     * 수정된 제안 함수 데이터 생성 (블록 번호 포함)
+     */
+    private String createProposeFunctionData(String title, String description, BigInteger startBlock, BigInteger endBlock) {
+        try {
+            // 실제 컨트랙트의 propose 함수 시그니처에 맞게 수정
+            // 예: propose(string memory title, string memory description, uint256 startBlock, uint256 endBlock)
+
+            Function proposeFunction = new Function(
+                    "propose", // 또는 "createProposal"
+                    Arrays.asList(
+                            new Utf8String(title),
+                            new Utf8String(description),
+                            new Uint256(startBlock),
+                            new Uint256(endBlock)
+                    ),
+                    Collections.emptyList()
+            );
+
+            String functionData = FunctionEncoder.encode(proposeFunction);
+
+            log.info("=== 함수 데이터 생성 완료 ===");
+            log.info("Title: {}", title);
+            log.info("Description: {}", description);
+            log.info("Start Block: {}", startBlock);
+            log.info("End Block: {}", endBlock);
+            log.info("Function data: {}", functionData);
+
+            return functionData;
+
+        } catch (Exception e) {
+            log.error("Failed to create propose function data", e);
+            throw new RuntimeException("Failed to create propose function data: " + e.getMessage(), e);
+        }
+    }
     // === 내부 데이터 클래스들 ===
 
     /**

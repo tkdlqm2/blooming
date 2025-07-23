@@ -19,7 +19,7 @@ public class ProposalDto {
     private final long requiredQuorum;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
-    private final String transactionSignature;
+    private final String txHash;
     private final String creatorWalletAddress;
 
     public ProposalDto(
@@ -33,7 +33,7 @@ public class ProposalDto {
             long requiredQuorum,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            String transactionSignature,
+            String txHash,
             String creatorWalletAddress) {
         this.id = id;
         this.creatorId = creatorId;
@@ -45,7 +45,7 @@ public class ProposalDto {
         this.requiredQuorum = requiredQuorum;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.transactionSignature = transactionSignature;
+        this.txHash = txHash;
         this.creatorWalletAddress = creatorWalletAddress;
     }
 
@@ -61,8 +61,8 @@ public class ProposalDto {
             .requiredQuorum(proposal.getRequiredQuorum())
             .createdAt(proposal.getCreatedAt())
             .updatedAt(proposal.getUpdatedAt())
-            .transactionSignature(null)
-            .creatorWalletAddress(null)
+            .txHash(proposal.getTxHash())
+            .creatorWalletAddress(proposal.getCreatorWalletAddress())
             .build();
     }
     
@@ -78,7 +78,7 @@ public class ProposalDto {
             .requiredQuorum(proposal.getRequiredQuorum())
             .createdAt(proposal.getCreatedAt())
             .updatedAt(proposal.getUpdatedAt())
-            .transactionSignature(transactionSignature)
+            .txHash(transactionSignature)
             .creatorWalletAddress(creatorWalletAddress)
             .build();
     }
@@ -98,7 +98,7 @@ public class ProposalDto {
         private long requiredQuorum;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
-        private String transactionSignature;
+        private String txHash;
         private String creatorWalletAddress;
         
         public ProposalDtoBuilder id(UUID id) {
@@ -151,8 +151,8 @@ public class ProposalDto {
             return this;
         }
         
-        public ProposalDtoBuilder transactionSignature(String transactionSignature) {
-            this.transactionSignature = transactionSignature;
+        public ProposalDtoBuilder txHash(String txHash) {
+            this.txHash = txHash;
             return this;
         }
         
@@ -162,7 +162,7 @@ public class ProposalDto {
         }
         
         public ProposalDto build() {
-            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, transactionSignature, creatorWalletAddress);
+            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, txHash, creatorWalletAddress);
         }
     }
 
@@ -206,8 +206,8 @@ public class ProposalDto {
         return updatedAt;
     }
     
-    public String getTransactionSignature() {
-        return transactionSignature;
+    public String getTxHash() {
+        return txHash;
     }
     
     public String getCreatorWalletAddress() {

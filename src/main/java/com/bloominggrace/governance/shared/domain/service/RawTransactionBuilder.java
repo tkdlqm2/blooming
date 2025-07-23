@@ -1,6 +1,7 @@
 package com.bloominggrace.governance.shared.domain.service;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -58,6 +59,7 @@ public interface RawTransactionBuilder {
      * @return RawTransaction JSON 문자열
      */
     String createVoteRawTransaction(
+        BigInteger proposalCount,
         UUID proposalId,
         String walletAddress,
         String voteType,
