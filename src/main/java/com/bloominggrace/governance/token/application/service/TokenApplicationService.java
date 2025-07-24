@@ -2,21 +2,15 @@ package com.bloominggrace.governance.token.application.service;
 
 import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
-import com.bloominggrace.governance.token.domain.model.TokenAmount;
 import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountRepository;
 import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.domain.model.BlockchainTransactionType;
-import com.bloominggrace.governance.shared.domain.model.Transaction;
-import com.bloominggrace.governance.shared.infrastructure.repository.TransactionRepository;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator.TransactionResult;
-import com.bloominggrace.governance.shared.domain.DomainEventPublisher;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.repository.TransactionRepository;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.service.TransactionOrchestrator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
@@ -29,8 +23,6 @@ public class TokenApplicationService {
     private final TokenAccountRepository tokenAccountRepository;
     private final WalletApplicationService walletApplicationService;
     private final TransactionRepository transactionRepository;
-    private final TransactionOrchestrator transactionOrchestrator;
-    
     /**
      * 토큰 계정 생성 또는 조회
      */
@@ -73,8 +65,5 @@ public class TokenApplicationService {
         return tokenAccountRepository.findAllByUserId(userId);
     }
     
-    @Transactional(readOnly = true)
-    public List<Transaction> getTransactionHistory(UserId userId) {
-        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
-    }
-} 
+    // Transaction 관련 메서드는 blockchain 패키지로 이동됨
+}

@@ -1,7 +1,7 @@
 package com.bloominggrace.governance.wallet.domain.service;
 
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.util.Base58Utils;
+import com.bloominggrace.governance.shared.blockchain.util.Base58Utils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -64,7 +64,7 @@ public class KeyPairProvider {
      * @return hexadecimal string
      */
     public static String bytesToHex(byte[] bytes) {
-        return com.bloominggrace.governance.shared.util.HexUtils.bytesToHex(bytes);
+        return com.bloominggrace.governance.shared.blockchain.util.HexUtils.bytesToHex(bytes);
     }
     
     /**

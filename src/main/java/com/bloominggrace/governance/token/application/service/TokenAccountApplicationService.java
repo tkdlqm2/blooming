@@ -1,8 +1,8 @@
 package com.bloominggrace.governance.token.application.service;
 
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
-import com.bloominggrace.governance.shared.domain.constants.SolanaConstants;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.SolanaConstants;
 import com.bloominggrace.governance.token.application.dto.CreateTokenAccountRequest;
 import com.bloominggrace.governance.token.application.dto.TokenAccountDto;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;

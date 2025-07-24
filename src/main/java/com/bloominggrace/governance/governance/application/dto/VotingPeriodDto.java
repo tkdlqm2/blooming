@@ -1,9 +1,11 @@
 package com.bloominggrace.governance.governance.application.dto;
 
 import com.bloominggrace.governance.governance.domain.model.VotingPeriod;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 
+@Getter
 public class VotingPeriodDto {
     private final LocalDateTime startDate;
     private final LocalDateTime endDate;
@@ -39,29 +41,5 @@ public class VotingPeriodDto {
             votingPeriod.isVotingNotStarted(),
             votingPeriod.getRemainingDays()
         );
-    }
-
-    public LocalDateTime getStartDate() {
-        return startDate;
-    }
-
-    public LocalDateTime getEndDate() {
-        return endDate;
-    }
-
-    public boolean isVotingActive() {
-        return isVotingActive;
-    }
-
-    public boolean isVotingEnded() {
-        return isVotingEnded;
-    }
-
-    public boolean isVotingNotStarted() {
-        return isVotingNotStarted;
-    }
-
-    public long getRemainingDays() {
-        return remainingDays;
     }
 } 

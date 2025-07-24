@@ -38,12 +38,7 @@ public class ProposalRepositoryAdapter implements ProposalRepository {
     public List<Proposal> findByStatus(ProposalStatus status) {
         return jpaRepository.findByStatus(status);
     }
-    
-    @Override
-    public List<Proposal> findByVotingPeriodEndBefore(LocalDateTime endDate) {
-        return jpaRepository.findByVotingPeriodEndBefore(endDate);
-    }
-    
+
     @Override
     public List<Proposal> findAll() {
         return jpaRepository.findAll();
@@ -53,9 +48,4 @@ public class ProposalRepositoryAdapter implements ProposalRepository {
     public void delete(ProposalId id) {
         jpaRepository.deleteById(id);
     }
-    
-    @Override
-    public boolean existsById(ProposalId id) {
-        return jpaRepository.existsById(id);
-    }
-} 
+}

@@ -14,8 +14,6 @@ public interface VoteRepository {
     Optional<Vote> findById(VoteId id);
     List<Vote> findByProposalId(ProposalId proposalId);
     List<Vote> findByVoterId(UserId voterId);
-    Optional<Vote> findByProposalIdAndVoterId(ProposalId proposalId, UserId voterId);
-    List<Vote> findByProposalIdAndVoteType(ProposalId proposalId, VoteType voteType);
     List<Vote> findAll();
     void delete(VoteId id);
     boolean existsByProposalIdAndVoterId(ProposalId proposalId, UserId voterId);

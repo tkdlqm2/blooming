@@ -4,10 +4,15 @@ import com.bloominggrace.governance.governance.domain.model.Proposal;
 import com.bloominggrace.governance.governance.domain.model.ProposalStatus;
 import com.bloominggrace.governance.governance.domain.model.VoteResults;
 import com.bloominggrace.governance.governance.domain.model.VotingPeriod;
+import lombok.Builder;
+import lombok.Getter;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
+@Builder
 public class ProposalDto {
     private final UUID id;
     private final UUID creatorId;
@@ -21,36 +26,7 @@ public class ProposalDto {
     private final LocalDateTime updatedAt;
     private final String txHash;
     private final String creatorWalletAddress;
-    private final long proposalCount;
-
-    public ProposalDto(
-            UUID id,
-            UUID creatorId,
-            String title,
-            String description,
-            String status,
-            VotingPeriodDto votingPeriod,
-            VoteResultsDto voteResults,
-            long requiredQuorum,
-            LocalDateTime createdAt,
-            LocalDateTime updatedAt,
-            long proposalCount,
-            String txHash,
-            String creatorWalletAddress) {
-        this.id = id;
-        this.creatorId = creatorId;
-        this.title = title;
-        this.description = description;
-        this.status = status;
-        this.votingPeriod = votingPeriod;
-        this.voteResults = voteResults;
-        this.requiredQuorum = requiredQuorum;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.txHash = txHash;
-        this.creatorWalletAddress = creatorWalletAddress;
-        this.proposalCount = proposalCount;
-    }
+    private final BigInteger proposalCount;
 
     public static ProposalDto from(Proposal proposal) {
         return ProposalDto.builder()
@@ -66,7 +42,7 @@ public class ProposalDto {
             .updatedAt(proposal.getUpdatedAt())
             .txHash(proposal.getTxHash())
             .creatorWalletAddress(proposal.getCreatorWalletAddress())
-            .proposalCount(proposal.getProposalCount() != null ? proposal.getProposalCount().longValue() : 0L)
+            .proposalCount(proposal.getProposalCount())
             .build();
     }
     
@@ -85,146 +61,5 @@ public class ProposalDto {
             .txHash(transactionSignature)
             .creatorWalletAddress(creatorWalletAddress)
             .build();
-    }
-    
-    public static ProposalDtoBuilder builder() {
-        return new ProposalDtoBuilder();
-    }
-    
-    public static class ProposalDtoBuilder {
-        private UUID id;
-        private UUID creatorId;
-        private String title;
-        private String description;
-        private String status;
-        private VotingPeriodDto votingPeriod;
-        private VoteResultsDto voteResults;
-        private long requiredQuorum;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
-        private String txHash;
-        private String creatorWalletAddress;
-        private long proposalCount;
-        
-        public ProposalDtoBuilder id(UUID id) {
-            this.id = id;
-            return this;
-        }
-        
-        public ProposalDtoBuilder creatorId(UUID creatorId) {
-            this.creatorId = creatorId;
-            return this;
-        }
-        
-        public ProposalDtoBuilder title(String title) {
-            this.title = title;
-            return this;
-        }
-        
-        public ProposalDtoBuilder description(String description) {
-            this.description = description;
-            return this;
-        }
-        
-        public ProposalDtoBuilder status(String status) {
-            this.status = status;
-            return this;
-        }
-        
-        public ProposalDtoBuilder votingPeriod(VotingPeriodDto votingPeriod) {
-            this.votingPeriod = votingPeriod;
-            return this;
-        }
-        
-        public ProposalDtoBuilder voteResults(VoteResultsDto voteResults) {
-            this.voteResults = voteResults;
-            return this;
-        }
-        
-        public ProposalDtoBuilder requiredQuorum(long requiredQuorum) {
-            this.requiredQuorum = requiredQuorum;
-            return this;
-        }
-        
-        public ProposalDtoBuilder createdAt(LocalDateTime createdAt) {
-            this.createdAt = createdAt;
-            return this;
-        }
-        
-        public ProposalDtoBuilder updatedAt(LocalDateTime updatedAt) {
-            this.updatedAt = updatedAt;
-            return this;
-        }
-        
-        public ProposalDtoBuilder txHash(String txHash) {
-            this.txHash = txHash;
-            return this;
-        }
-        
-        public ProposalDtoBuilder creatorWalletAddress(String creatorWalletAddress) {
-            this.creatorWalletAddress = creatorWalletAddress;
-            return this;
-        }
-        
-        public ProposalDtoBuilder proposalCount(long proposalCount) {
-            this.proposalCount = proposalCount;
-            return this;
-        }
-        
-        public ProposalDto build() {
-            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, proposalCount, txHash, creatorWalletAddress);
-        }
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getCreatorId() {
-        return creatorId;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public VotingPeriodDto getVotingPeriod() {
-        return votingPeriod;
-    }
-
-    public VoteResultsDto getVoteResults() {
-        return voteResults;
-    }
-
-    public long getRequiredQuorum() {
-        return requiredQuorum;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-    
-    public String getTxHash() {
-        return txHash;
-    }
-    
-    public String getCreatorWalletAddress() {
-        return creatorWalletAddress;
-    }
-    
-    public long getProposalCount() {
-        return proposalCount;
     }
 } 

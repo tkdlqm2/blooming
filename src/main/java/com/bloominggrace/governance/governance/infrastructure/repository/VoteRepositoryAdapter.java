@@ -40,16 +40,6 @@ public class VoteRepositoryAdapter implements VoteRepository {
     }
     
     @Override
-    public Optional<Vote> findByProposalIdAndVoterId(ProposalId proposalId, UserId voterId) {
-        return jpaRepository.findByProposalIdAndVoterId(proposalId, voterId);
-    }
-    
-    @Override
-    public List<Vote> findByProposalIdAndVoteType(ProposalId proposalId, VoteType voteType) {
-        return jpaRepository.findByProposalIdAndVoteType(proposalId, voteType);
-    }
-    
-    @Override
     public List<Vote> findAll() {
         return jpaRepository.findAll();
     }

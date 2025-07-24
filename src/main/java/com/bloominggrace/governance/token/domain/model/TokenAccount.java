@@ -2,12 +2,8 @@ package com.bloominggrace.governance.token.domain.model;
 
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.infrastructure.converter.UserIdConverter;
-import com.bloominggrace.governance.token.domain.event.TokenAccountActivatedEvent;
-import com.bloominggrace.governance.token.domain.event.TokenAccountDeactivatedEvent;
-import com.bloominggrace.governance.token.domain.event.TokensMintedEvent;
-import com.bloominggrace.governance.token.domain.event.TokensTransferredEvent;
-import com.bloominggrace.governance.token.domain.event.TokensBurnedEvent;
+import com.bloominggrace.governance.shared.security.infrastructure.converter.UserIdConverter;
+
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import lombok.Getter;
@@ -89,7 +85,7 @@ public class TokenAccount extends AggregateRoot {
         this.availableBalance = this.availableBalance.add(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensMintedEvent(userId, new TokenAmount(amount.toString()), description));
+
     }
     
     public void transferTokens(BigDecimal amount, String description) {
@@ -105,7 +101,7 @@ public class TokenAccount extends AggregateRoot {
         this.totalBalance = this.totalBalance.subtract(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensTransferredEvent(userId, null, new TokenAmount(amount.toString()), description));
+
     }
     
     public void burnTokens(BigDecimal amount, String description) {
@@ -121,7 +117,7 @@ public class TokenAccount extends AggregateRoot {
         this.totalBalance = this.totalBalance.subtract(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensBurnedEvent(userId, new TokenAmount(amount.toString()), description));
+
     }
     
     public void receiveTokens(BigDecimal amount, String description) {
@@ -133,7 +129,7 @@ public class TokenAccount extends AggregateRoot {
         this.availableBalance = this.availableBalance.add(amount);
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokensTransferredEvent(null, wallet.getWalletAddress(), new TokenAmount(amount.toString()), description));
+
     }
 
     public void deactivate() {
@@ -144,7 +140,7 @@ public class TokenAccount extends AggregateRoot {
         this.isActive = false;
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokenAccountDeactivatedEvent(userId, wallet.getWalletAddress()));
+
     }
 
     public void activate() {
@@ -155,7 +151,7 @@ public class TokenAccount extends AggregateRoot {
         this.isActive = true;
         this.updatedAt = LocalDateTime.now();
         
-        addDomainEvent(new TokenAccountActivatedEvent(userId, wallet.getWalletAddress()));
+
     }
 
     public boolean hasAvailableBalance(BigDecimal amount) {

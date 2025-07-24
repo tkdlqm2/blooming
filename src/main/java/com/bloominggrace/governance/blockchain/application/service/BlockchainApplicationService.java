@@ -4,7 +4,7 @@ import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
 import com.bloominggrace.governance.blockchain.application.service.BlockchainClientFactory;
 import com.bloominggrace.governance.wallet.application.service.WalletServiceFactory;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.shared.security.infrastructure.service.AdminWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -1,6 +1,5 @@
 package com.bloominggrace.governance.blockchain.domain.service;
 
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 
 import java.math.BigInteger;

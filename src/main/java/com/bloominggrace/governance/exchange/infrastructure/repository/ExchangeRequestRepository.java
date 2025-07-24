@@ -11,5 +11,4 @@ import java.util.UUID;
 @Repository
 public interface ExchangeRequestRepository extends JpaRepository<ExchangeRequest, ExchangeRequestId> {
     List<ExchangeRequest> findByUserId(UUID userId);
-    List<ExchangeRequest> findByUserIdOrderByCreatedAtDesc(UUID userId);
-} 
+}

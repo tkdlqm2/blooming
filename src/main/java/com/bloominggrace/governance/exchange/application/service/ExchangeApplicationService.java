@@ -7,10 +7,10 @@ import com.bloominggrace.governance.exchange.infrastructure.repository.ExchangeR
 import com.bloominggrace.governance.point.application.service.PointManagementService;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
-import com.bloominggrace.governance.shared.domain.constants.SolanaConstants;
-import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.SolanaConstants;
+import com.bloominggrace.governance.shared.security.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.service.TransactionOrchestrator;
 import com.bloominggrace.governance.token.application.service.TokenAccountApplicationService;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
 import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountRepository;
@@ -54,7 +54,7 @@ public class ExchangeApplicationService {
             userId, pointAmount, walletAddress);
         
         // 1. 포인트 잔액 확인
-        var pointBalance = pointManagementService.getPointBalance(userId.getValue());
+        PointManagementService.PointBalance pointBalance = pointManagementService.getPointBalance(userId.getValue());
         if (pointBalance.getAvailableBalance().getAmount().compareTo(pointAmount) < 0) {
             throw new IllegalArgumentException("Insufficient point balance. Available: " + 
                 pointBalance.getAvailableBalance().getAmount() + ", Required: " + pointAmount);
@@ -290,38 +290,9 @@ public class ExchangeApplicationService {
         );
     }
     
-    /**
-     * 취소를 위한 교환 요청을 검증하고 조회합니다.
-     */
-    private ExchangeRequest validateAndGetExchangeRequestForCancellation(ExchangeRequestId exchangeRequestId) {
-        ExchangeRequest exchangeRequest = exchangeRequestRepository.findById(exchangeRequestId)
-            .orElseThrow(() -> new IllegalArgumentException("Exchange request not found: " + exchangeRequestId));
-        
-        if (exchangeRequest.getStatus() == ExchangeStatus.COMPLETED) {
-            throw new IllegalStateException("Exchange request cannot be cancelled: " + exchangeRequestId);
-        }
-        
-        return exchangeRequest;
-    }
+
     
-    /**
-     * 처리 중인 경우 포인트 해제
-     */
-    private void unfreezePointsIfProcessing(ExchangeRequest exchangeRequest, ExchangeRequestId exchangeRequestId) {
-        if (exchangeRequest.getStatus() == ExchangeStatus.PROCESSING) {
-            pointManagementService.unfreezePoints(
-                exchangeRequest.getUserId(),
-                exchangeRequest.getPointAmount(),
-                exchangeRequestId.getValue().toString()
-            );
-        }
-    }
+
     
-    /**
-     * 교환 요청 취소 처리
-     */
-    private void cancelExchangeRequest(ExchangeRequest exchangeRequest) {
-        exchangeRequest.cancel();
-        exchangeRequestRepository.save(exchangeRequest);
-    }
+
 } 

@@ -1,8 +1,6 @@
 package com.bloominggrace.governance.point.domain.model;
 
-import com.bloominggrace.governance.point.domain.event.PointsEarnedEvent;
-import com.bloominggrace.governance.point.domain.event.PointsFrozenEvent;
-import com.bloominggrace.governance.point.domain.event.PointsUnfrozenEvent;
+
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -41,14 +39,14 @@ public class PointAccount extends AggregateRoot {
 
     public void earnPoints(PointAmount amount, String reason) {
         this.balance = this.balance.add(amount.getAmount());
-        addDomainEvent(new PointsEarnedEvent(userId, amount, reason));
+
     }
 
     public void freezePoints(PointAmount amount, String exchangeRequestId) {
         if (balance.compareTo(amount.getAmount()) >= 0) {
             this.balance = this.balance.subtract(amount.getAmount());
             this.frozenBalance = this.frozenBalance.add(amount.getAmount());
-            addDomainEvent(new PointsFrozenEvent(userId, amount, exchangeRequestId));
+
         } else {
             throw new IllegalArgumentException("동결할 포인트가 부족합니다");
         }
@@ -58,7 +56,7 @@ public class PointAccount extends AggregateRoot {
         if (frozenBalance.compareTo(amount.getAmount()) >= 0) {
             this.frozenBalance = this.frozenBalance.subtract(amount.getAmount());
             this.balance = this.balance.add(amount.getAmount());
-            addDomainEvent(new PointsUnfrozenEvent(userId, amount, exchangeRequestId));
+
         } else {
             throw new IllegalArgumentException("해제할 동결 포인트가 부족합니다");
         }

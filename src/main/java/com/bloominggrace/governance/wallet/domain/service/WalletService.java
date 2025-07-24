@@ -3,8 +3,8 @@ package com.bloominggrace.governance.wallet.domain.service;
 import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.SignedTransaction;
+import com.bloominggrace.governance.shared.blockchain.domain.model.TransactionBody;
+import com.bloominggrace.governance.shared.blockchain.domain.model.SignedTransaction;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import org.springframework.context.ApplicationContext;
 

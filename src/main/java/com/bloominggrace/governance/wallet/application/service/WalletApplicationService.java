@@ -1,7 +1,7 @@
 package com.bloominggrace.governance.wallet.application.service;
 
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.service.EncryptionService;
+import com.bloominggrace.governance.shared.security.domain.service.EncryptionService;
 import com.bloominggrace.governance.user.application.service.UserService;
 import com.bloominggrace.governance.user.domain.model.User;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;

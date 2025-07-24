@@ -2,9 +2,8 @@ package com.bloominggrace.governance.governance.domain.model;
 
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.governance.domain.event.ProposalActivatedEvent;
-import com.bloominggrace.governance.governance.domain.event.ProposalCreatedEvent;
-import com.bloominggrace.governance.governance.domain.event.ProposalVotingEndedEvent;
+
+import lombok.Getter;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -12,6 +11,7 @@ import java.math.BigInteger;
 
 @Entity
 @Table(name = "proposals")
+@Getter
 public class Proposal extends AggregateRoot {
     
     @EmbeddedId
@@ -86,58 +86,6 @@ public class Proposal extends AggregateRoot {
         this.creatorWalletAddress = null;
     }
 
-    public ProposalId getId() {
-        return id;
-    }
-
-    public UserId getCreatorId() {
-        return creatorId;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public ProposalStatus getStatus() {
-        return status;
-    }
-
-    public VotingPeriod getVotingPeriod() {
-        return votingPeriod;
-    }
-
-    public VoteResults getVoteResults() {
-        return voteResults;
-    }
-
-    public long getRequiredQuorum() {
-        return requiredQuorum;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public String getTxHash() {
-        return txHash;
-    }
-
-    public BigInteger getProposalCount() {
-        return proposalCount;
-    }
-
-    public String getCreatorWalletAddress() {
-        return creatorWalletAddress;
-    }
-
     public void activate() {
         if (this.status != ProposalStatus.DRAFT) {
             throw new IllegalStateException("Only draft proposals can be activated");
@@ -145,8 +93,6 @@ public class Proposal extends AggregateRoot {
         
         this.status = ProposalStatus.ACTIVE;
         this.updatedAt = LocalDateTime.now();
-        
-        addDomainEvent(new ProposalActivatedEvent(id, creatorId, title));
     }
 
     public void startVoting() {
@@ -207,8 +153,6 @@ public class Proposal extends AggregateRoot {
         }
         
         this.updatedAt = LocalDateTime.now();
-        
-        addDomainEvent(new ProposalVotingEndedEvent(id, status, voteResults));
     }
 
     public void updateTitle(String newTitle) {

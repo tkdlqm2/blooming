@@ -1,7 +1,7 @@
 package com.bloominggrace.governance.wallet.infrastructure.controller;
 
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
+import com.bloominggrace.governance.shared.security.infrastructure.service.JwtService;
 import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
 import com.bloominggrace.governance.wallet.application.dto.WalletDto;
 import com.bloominggrace.governance.wallet.application.dto.CreateWalletRequest;
@@ -11,9 +11,9 @@ import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.SignedTransaction;
-import com.bloominggrace.governance.shared.domain.model.TransactionRequest;
+import com.bloominggrace.governance.shared.blockchain.domain.model.TransactionBody;
+import com.bloominggrace.governance.shared.blockchain.domain.model.SignedTransaction;
+import com.bloominggrace.governance.shared.blockchain.domain.model.TransactionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

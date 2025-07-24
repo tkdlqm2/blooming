@@ -5,7 +5,8 @@ import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.point.domain.model.PointTransaction;
 import com.bloominggrace.governance.point.infrastructure.repository.PointAccountRepository;
 import com.bloominggrace.governance.point.infrastructure.repository.PointTransactionRepository;
-import com.bloominggrace.governance.shared.domain.DomainEventPublisher;
+
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +21,13 @@ public class PointManagementService {
 
     private final PointAccountRepository pointAccountRepository;
     private final PointTransactionRepository pointTransactionRepository;
-    private final DomainEventPublisher eventPublisher;
+
 
     // 포인트 적립
     public void earnPoints(UUID userId, PointAmount amount, String reason) {
         PointAccount account = getOrCreatePointAccount(userId);
         account.earnPoints(amount, reason);
         pointAccountRepository.save(account);
-        eventPublisher.publishAll(account.getDomainEvents());
     }
 
     // 포인트 동결 (교환용)
@@ -35,7 +35,6 @@ public class PointManagementService {
         PointAccount account = getPointAccount(userId);
         account.freezePoints(amount, exchangeRequestId);
         pointAccountRepository.save(account);
-        eventPublisher.publishAll(account.getDomainEvents());
     }
 
     // 포인트 해제 (교환 취소시)
@@ -43,7 +42,6 @@ public class PointManagementService {
         PointAccount account = getPointAccount(userId);
         account.unfreezePoints(amount, exchangeRequestId);
         pointAccountRepository.save(account);
-        eventPublisher.publishAll(account.getDomainEvents());
     }
 
     // 포인트 잔액 조회
@@ -77,7 +75,6 @@ public class PointManagementService {
         PointAmount freeAmount = PointAmount.of(1000); // 1000 포인트 지급
         account.earnPoints(freeAmount, "무료 포인트 지급");
         pointAccountRepository.save(account);
-        eventPublisher.publishAll(account.getDomainEvents());
     }
 
     private PointAccount getPointAccount(UUID userId) {
@@ -85,6 +82,7 @@ public class PointManagementService {
                 .orElseThrow(() -> new IllegalArgumentException("포인트 계정을 찾을 수 없습니다: " + userId));
     }
 
+    @Getter
     public static class PointBalance {
         private final PointAmount availableBalance;
         private final PointAmount frozenBalance;
@@ -95,9 +93,5 @@ public class PointManagementService {
             this.frozenBalance = frozenBalance;
             this.totalBalance = totalBalance;
         }
-
-        public PointAmount getAvailableBalance() { return availableBalance; }
-        public PointAmount getFrozenBalance() { return frozenBalance; }
-        public PointAmount getTotalBalance() { return totalBalance; }
     }
 } 

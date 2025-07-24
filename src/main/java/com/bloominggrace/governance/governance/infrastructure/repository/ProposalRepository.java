@@ -14,8 +14,6 @@ public interface ProposalRepository {
     Optional<Proposal> findById(ProposalId id);
     List<Proposal> findByCreatorId(UserId creatorId);
     List<Proposal> findByStatus(ProposalStatus status);
-    List<Proposal> findByVotingPeriodEndBefore(LocalDateTime endDate);
     List<Proposal> findAll();
     void delete(ProposalId id);
-    boolean existsById(ProposalId id);
-} 
+}

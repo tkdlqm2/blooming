@@ -1,18 +1,18 @@
 package com.bloominggrace.governance.wallet.infrastructure.service.solana;
 
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.service.EncryptionService;
+import com.bloominggrace.governance.shared.security.domain.service.EncryptionService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.domain.service.KeyPairProvider;
 import com.bloominggrace.governance.wallet.infrastructure.repository.WalletRepository;
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.SignedTransaction;
-import com.bloominggrace.governance.shared.domain.model.SolanaTransactionData;
-import com.bloominggrace.governance.shared.util.HashUtils;
-import com.bloominggrace.governance.shared.util.HexUtils;
-import com.bloominggrace.governance.shared.util.SignatureUtils;
+import com.bloominggrace.governance.shared.blockchain.domain.model.TransactionBody;
+import com.bloominggrace.governance.shared.blockchain.domain.model.SignedTransaction;
+import com.bloominggrace.governance.shared.blockchain.domain.model.solana.SolanaTransactionData;
+import com.bloominggrace.governance.shared.blockchain.util.HashUtils;
+import com.bloominggrace.governance.shared.blockchain.util.HexUtils;
+import com.bloominggrace.governance.shared.blockchain.util.SignatureUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,7 +28,7 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
 import com.bloominggrace.governance.user.domain.model.User;
 import com.bloominggrace.governance.user.infrastructure.repository.UserRepository;
-import com.bloominggrace.governance.shared.util.Base58Utils;
+import com.bloominggrace.governance.shared.blockchain.util.Base58Utils;
 import org.springframework.context.ApplicationContext;
 import lombok.extern.slf4j.Slf4j;
 

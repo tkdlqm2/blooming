@@ -5,7 +5,7 @@ import com.bloominggrace.governance.exchange.domain.model.ExchangeRequest;
 import com.bloominggrace.governance.exchange.domain.model.ExchangeRequestId;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
+import com.bloominggrace.governance.shared.security.infrastructure.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

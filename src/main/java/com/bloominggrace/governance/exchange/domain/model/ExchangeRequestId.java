@@ -2,11 +2,12 @@ package com.bloominggrace.governance.exchange.domain.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import lombok.EqualsAndHashCode;
 import java.io.Serializable;
-import java.util.Objects;
 import java.util.UUID;
 
 @Embeddable
+@EqualsAndHashCode
 public class ExchangeRequestId implements Serializable {
     @Column(name = "exchange_request_id", nullable = false, updatable = false)
     private UUID value;
@@ -31,18 +32,5 @@ public class ExchangeRequestId implements Serializable {
 
     public void setValue(UUID value) {
         this.value = value;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ExchangeRequestId that = (ExchangeRequestId) o;
-        return Objects.equals(value, that.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(value);
     }
 } 

@@ -5,7 +5,7 @@ import com.bloominggrace.governance.point.application.dto.ReceiveFreePointsRespo
 import com.bloominggrace.governance.point.application.service.PointManagementService;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.point.domain.model.PointTransaction;
-import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
+import com.bloominggrace.governance.shared.security.infrastructure.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -175,10 +175,5 @@ public class PointController {
             this.frozenBalance = frozenBalance;
             this.totalBalance = totalBalance;
         }
-
-        // Getters
-        public BigDecimal getAvailableBalance() { return availableBalance; }
-        public BigDecimal getFrozenBalance() { return frozenBalance; }
-        public BigDecimal getTotalBalance() { return totalBalance; }
     }
 } 

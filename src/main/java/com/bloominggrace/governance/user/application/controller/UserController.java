@@ -1,6 +1,6 @@
 package com.bloominggrace.governance.user.application.controller;
 
-import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
+import com.bloominggrace.governance.shared.security.infrastructure.service.JwtService;
 import com.bloominggrace.governance.user.application.dto.*;
 import com.bloominggrace.governance.user.application.service.UserService;
 import com.bloominggrace.governance.user.domain.model.User;

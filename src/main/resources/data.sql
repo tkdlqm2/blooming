@@ -42,7 +42,7 @@ INSERT INTO token_accounts (
     'a1b2c3d4-e5f6-7890-abcd-ef1234567890', 
     'f2aec616-1dcb-4e56-923d-16e07a58ae3c', 
     'ETHEREUM', 
-    '0xeafF00556BC06464511319dAb26D6CAC148b89d0', 
+    '0xd2Dfe16C1F31493530D297D58E32c337fd27615D',
     'TOKEN', 
     1000000.00, 
     1000000.00, 

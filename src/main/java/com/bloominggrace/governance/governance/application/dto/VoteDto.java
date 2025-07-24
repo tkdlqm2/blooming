@@ -4,10 +4,12 @@ import com.bloominggrace.governance.governance.domain.model.Vote;
 import com.bloominggrace.governance.governance.domain.model.VoteId;
 import com.bloominggrace.governance.governance.domain.model.VoteType;
 import com.bloominggrace.governance.shared.domain.UserId;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
 public class VoteDto {
     private final UUID id;
     private final UUID proposalId;
@@ -59,15 +61,4 @@ public class VoteDto {
             voterWalletAddress
         );
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getProposalId() { return proposalId; }
-    public UUID getVoterId() { return voterId; }
-    public String getVoteType() { return voteType; }
-    public long getVotingPower() { return votingPower; }
-    public String getReason() { return reason; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public String getTransactionSignature() { return transactionSignature; }
-    public String getVoterWalletAddress() { return voterWalletAddress; }
 } 

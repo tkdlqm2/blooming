@@ -1,9 +1,6 @@
 package com.bloominggrace.governance.exchange.domain.model;
 
-import com.bloominggrace.governance.exchange.domain.event.ExchangeCancelledEvent;
-import com.bloominggrace.governance.exchange.domain.event.ExchangeCompletedEvent;
-import com.bloominggrace.governance.exchange.domain.event.ExchangeFailedEvent;
-import com.bloominggrace.governance.exchange.domain.event.ExchangeProcessingStartedEvent;
+
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.shared.domain.AggregateRoot;
 import jakarta.persistence.*;
@@ -61,7 +58,7 @@ public class ExchangeRequest extends AggregateRoot {
             throw new IllegalStateException("처리할 수 없는 상태입니다: " + this.status);
         }
         this.status = ExchangeStatus.PROCESSING;
-        addDomainEvent(new ExchangeProcessingStartedEvent(this.id, this.userId, this.pointAmount));
+
     }
 
     public void complete(String transactionSignature) {
@@ -71,7 +68,7 @@ public class ExchangeRequest extends AggregateRoot {
         this.status = ExchangeStatus.COMPLETED;
         this.transactionSignature = transactionSignature;
         this.completedAt = LocalDateTime.now();
-        addDomainEvent(new ExchangeCompletedEvent(this.id, this.userId, this.pointAmount, transactionSignature));
+
     }
 
     public void cancel() {
@@ -79,15 +76,13 @@ public class ExchangeRequest extends AggregateRoot {
             throw new IllegalStateException("이미 완료된 교환은 취소할 수 없습니다");
         }
         this.status = ExchangeStatus.CANCELLED;
-        addDomainEvent(new ExchangeCancelledEvent(this.id, this.userId, this.pointAmount));
+
     }
 
     public void fail() {
         this.status = ExchangeStatus.FAILED;
-        addDomainEvent(new ExchangeFailedEvent(this.id, this.userId, this.pointAmount));
+
     }
 
-    public ExchangeRequestId getId() {
-        return id;
-    }
+
 } 

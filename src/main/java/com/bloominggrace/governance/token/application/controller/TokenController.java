@@ -3,7 +3,7 @@ package com.bloominggrace.governance.token.application.controller;
 import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.token.application.service.TokenApplicationService;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
-import com.bloominggrace.governance.shared.domain.model.Transaction;
+import com.bloominggrace.governance.shared.blockchain.domain.model.Transaction;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,12 +49,5 @@ public class TokenController {
         return ResponseEntity.ok(accounts);
     }
     
-    /**
-     * 트랜잭션 히스토리 조회
-     */
-    @GetMapping("/transactions/{userId}")
-    public ResponseEntity<List<Transaction>> getTransactionHistory(@PathVariable String userId) {
-        List<Transaction> transactions = tokenApplicationService.getTransactionHistory(new UserId(UUID.fromString(userId)));
-        return ResponseEntity.ok(transactions);
-    }
+    // Transaction 관련 메서드는 blockchain 패키지로 이동됨
 } 

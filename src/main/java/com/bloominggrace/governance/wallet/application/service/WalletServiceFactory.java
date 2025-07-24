@@ -5,7 +5,7 @@ import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.infrastructure.repository.WalletRepository;
 import com.bloominggrace.governance.wallet.infrastructure.service.ethereum.EthereumWallet;
 import com.bloominggrace.governance.wallet.infrastructure.service.solana.SolanaWalletService;
-import com.bloominggrace.governance.shared.domain.service.EncryptionService;
+import com.bloominggrace.governance.shared.security.domain.service.EncryptionService;
 import com.bloominggrace.governance.user.infrastructure.repository.UserRepository;
 import org.springframework.context.ApplicationContext;
 

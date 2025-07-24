@@ -1,14 +1,14 @@
 package com.bloominggrace.governance.wallet.infrastructure.service.ethereum;
 
 import com.bloominggrace.governance.shared.domain.UserId;
-import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
-import com.bloominggrace.governance.shared.domain.service.EncryptionService;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.security.domain.service.EncryptionService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.domain.service.KeyPairProvider;
 import com.bloominggrace.governance.wallet.infrastructure.repository.WalletRepository;
-import com.bloominggrace.governance.shared.domain.model.TransactionBody;
+import com.bloominggrace.governance.shared.blockchain.domain.model.TransactionBody;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.bloominggrace.governance.user.domain.model.User;

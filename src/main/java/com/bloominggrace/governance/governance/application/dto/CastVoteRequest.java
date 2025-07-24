@@ -18,6 +18,4 @@ public class CastVoteRequest {
     private String reason; // 선택적
     private String voterWalletAddress;
     private NetworkType networkType;
-    
-    // 투표 파워는 서버에서 자동 계산 (토큰 잔액 기반)
-} 
+}

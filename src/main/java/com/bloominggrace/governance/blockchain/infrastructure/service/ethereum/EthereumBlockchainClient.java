@@ -3,8 +3,8 @@ package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum;
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
 import com.bloominggrace.governance.blockchain.infrastructure.service.dto.BlockchainRpcRequest;
 import com.bloominggrace.governance.blockchain.infrastructure.service.dto.BlockchainRpcResponse;
-import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
-import com.bloominggrace.governance.shared.util.JsonRpcClient;
+import com.bloominggrace.governance.shared.blockchain.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.blockchain.util.JsonRpcClient;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +46,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getLatestBlockHash() {
         try {
-            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER, Arrays.asList(EthereumConstants.RpcParams.LATEST, EthereumConstants.RpcParams.EXCLUDE_TRANSACTIONS));
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER, Arrays.asList(EthereumConstants.RpcParams.LATEST, false));
             BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
@@ -384,7 +384,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
                 EthereumConstants.RpcParams.LATEST : blockNumber;
             
             BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER,
-                Arrays.asList(targetBlock, EthereumConstants.RpcParams.EXCLUDE_TRANSACTIONS));
+                Arrays.asList(targetBlock, false));
             BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request,
                 new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             

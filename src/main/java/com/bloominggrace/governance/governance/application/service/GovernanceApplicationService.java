@@ -1,5 +1,6 @@
 package com.bloominggrace.governance.governance.application.service;
 
+import com.bloominggrace.governance.shared.blockchain.domain.constants.EthereumConstants;
 import com.bloominggrace.governance.shared.domain.UserId;
 import com.bloominggrace.governance.governance.domain.model.*;
 import com.bloominggrace.governance.governance.infrastructure.repository.ProposalRepository;
@@ -8,12 +9,12 @@ import com.bloominggrace.governance.governance.application.dto.*;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.token.application.service.TokenApplicationService;
-import com.bloominggrace.governance.shared.domain.model.BlockchainTransactionType;
-import com.bloominggrace.governance.shared.domain.model.Transaction;
-import com.bloominggrace.governance.shared.infrastructure.repository.TransactionRepository;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator.TransactionResult;
-import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.shared.blockchain.domain.model.BlockchainTransactionType;
+import com.bloominggrace.governance.shared.blockchain.domain.model.Transaction;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.repository.TransactionRepository;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.service.TransactionOrchestrator;
+import com.bloominggrace.governance.shared.blockchain.infrastructure.service.TransactionOrchestrator.TransactionResult;
+import com.bloominggrace.governance.shared.security.infrastructure.service.AdminWalletService;
 import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountJpaRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -315,44 +315,7 @@ public class GovernanceApplicationService {
             throw e;
         }
     }
-    
-    /**
-     * 투표권 위임
-     */
-    public String delegateVotes(
-            String delegateeWalletAddress,
-            String networkType) {
-        
-        try {
-            NetworkType networkTypeEnum = NetworkType.valueOf(networkType.toUpperCase());
-            AdminWalletService.AdminWalletInfo adminWallet = adminWalletService.getAdminWallet(networkTypeEnum);
 
-            // TransactionOrchestrator를 통해 위임 트랜잭션 실행
-            TransactionResult txResult = transactionOrchestrator.executeDelegationCreation(
-                adminWallet.getWalletAddress(),
-                delegateeWalletAddress,
-                networkTypeEnum
-            );
-
-            if (!txResult.isSuccess()) {
-                throw new RuntimeException("Failed to delegate votes: " + txResult.getErrorMessage());
-            }
-            
-            String transactionHash = txResult.getTransactionHash();
-            System.out.println("✅ 투표권 위임 성공!");
-            System.out.println("위임 트랜잭션 해시: " + transactionHash);
-            System.out.println("=== 🎯 투표권 위임 완료 ===");
-            
-            return transactionHash;
-            
-        } catch (Exception e) {
-            System.err.println("=== ❌ 투표권 위임 실패 ===");
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
-        }
-    }
-    
     // ===== 조회 메서드들 =====
     
     @Transactional(readOnly = true)
@@ -424,7 +387,7 @@ public class GovernanceApplicationService {
             // 2. 투표자 토큰 잔액 확인 - 실제 컨트랙트 주소 사용
             NetworkType networkTypeEnum = determineNetworkType(voterWalletAddress);
             TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
-                voterId, voterWalletAddress, networkTypeEnum, "0xeafF00556BC06464511319dAb26D6CAC148b89d0", "TOKEN");
+                voterId, voterWalletAddress, networkTypeEnum, EthereumConstants.Contracts.ERC20_CONTRACT_ADDRESS, "TOKEN");
             
             BigDecimal votingPower = tokenAccount.getAvailableBalance();
             if (votingPower.compareTo(BigDecimal.ZERO) <= 0) {
@@ -545,7 +508,7 @@ public class GovernanceApplicationService {
         try {
             NetworkType networkTypeEnum = determineNetworkType(voterWalletAddress);
             TokenAccount tokenAccount = tokenApplicationService.getOrCreateTokenAccount(
-                voterId, voterWalletAddress, networkTypeEnum, "0xeafF00556BC06464511319dAb26D6CAC148b89d0", "TOKEN");
+                voterId, voterWalletAddress, networkTypeEnum, EthereumConstants.Contracts.ERC20_CONTRACT_ADDRESS, "TOKEN");
             
             BigDecimal votingPower = tokenAccount.getAvailableBalance();
             if (votingPower.compareTo(BigDecimal.ZERO) <= 0) {
@@ -581,7 +544,6 @@ public class GovernanceApplicationService {
 
     // ===== 유틸리티 메서드들 =====
     private NetworkType determineNetworkType(String walletAddress) {
-        // 간단한 주소 길이로 네트워크 타입 판단 (실제로는 더 정교한 검증 필요)
         if (walletAddress.startsWith("0x") && walletAddress.length() == 42) {
             return NetworkType.ETHEREUM;
         } else if (walletAddress.length() == 44) {

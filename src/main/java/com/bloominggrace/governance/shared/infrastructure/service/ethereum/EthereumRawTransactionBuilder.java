@@ -148,15 +148,15 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
             log.info("End block: {}", endBlock);
             log.info("Voting duration in blocks: {}", endBlock.subtract(startBlock));
 
-            // 5. 거버넌스 컨트랙트 주소 가져오기
+                    // 5. 거버넌스 컨트랙트 주소 가져오기
             String governanceContractAddress = EthereumConstants.Contracts.GOVERNANCE_CONTRACT_ADDRESS;
 
             // 6. 실제 거버넌스 컨트랙트의 propose() 함수 데이터 생성 (블록 번호 포함)
             String functionData = createProposeFunctionData(title, description, startBlock.add(BigInteger.valueOf(6)), endBlock);
 
                     // 7. RawTransaction 생성
-            BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
-            BigInteger gasLimit = EthereumConstants.Gas.PROPOSAL_CREATION_GAS_LIMIT;
+        BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
+        BigInteger gasLimit = EthereumConstants.Gas.PROPOSAL_CREATION_GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // propose() 함수는 value가 0
 
             // 8. RawTransaction을 JSON 형태로 반환 (기존 인터페이스 유지)
