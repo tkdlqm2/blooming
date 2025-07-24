@@ -1,0 +1,107 @@
+package com.bloominggrace.governance.blockchain.application.service;
+
+import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
+import com.bloominggrace.governance.blockchain.application.service.BlockchainClientFactory;
+import com.bloominggrace.governance.wallet.application.service.WalletServiceFactory;
+import com.bloominggrace.governance.wallet.domain.model.NetworkType;
+import com.bloominggrace.governance.shared.security.infrastructure.service.AdminWalletService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.Optional;
+import java.math.BigInteger;
+
+@Service
+@RequiredArgsConstructor
+public class BlockchainApplicationService {
+
+    private final BlockchainClientFactory blockchainClientFactory;
+    /**
+     * 잔액을 조회합니다.
+     */
+    public BigDecimal getBalance(String address, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return new BigDecimal(blockchainClient.getBalance(address));
+    }
+
+    /**
+     * 토큰 잔액을 조회합니다.
+     */
+    public BigDecimal getTokenBalance(String walletAddress, String tokenAddress, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return new BigDecimal(blockchainClient.getTokenBalance(tokenAddress, walletAddress));
+    }
+
+    /**
+     * 트랜잭션을 조회합니다.
+     */
+    public Optional<String> getTransaction(String txHash, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return Optional.of(blockchainClient.getTransactionStatus(txHash));
+    }
+
+    /**
+     * 트랜잭션 영수증을 조회합니다.
+     */
+    public Optional<String> getTransactionReceipt(String txHash, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return Optional.of(blockchainClient.getTransactionReceipt(txHash));
+    }
+
+    /**
+     * 가스 가격을 조회합니다.
+     */
+    public BigDecimal getGasPrice(NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return new BigDecimal(blockchainClient.getGasPrice());
+    }
+
+    /**
+     * 가스 한도를 추정합니다.
+     */
+    public String estimateGas(String fromAddress, String toAddress, String data, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.estimateGas(fromAddress, toAddress, data);
+    }
+
+    /**
+     * 계정의 nonce를 조회합니다.
+     */
+    public String getNonce(String address, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.getNonce(address);
+    }
+
+    /**
+     * 최신 블록 번호를 조회합니다.
+     */
+    public String getLatestBlockNumber(NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.getLatestBlockNumber();
+    }
+
+    /**
+     * 최신 블록 해시를 조회합니다.
+     */
+    public String getLatestBlockHash(NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.getLatestBlockHash();
+    }
+
+    /**
+     * 블록 정보를 조회합니다.
+     */
+    public String getBlockByHash(String blockHash, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.getBlockByHash(blockHash);
+    }
+
+    /**
+     * 블록 번호로 블록 정보를 조회합니다.
+     */
+    public String getBlockByNumber(String blockNumber, NetworkType networkType) {
+        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
+        return blockchainClient.getBlockByNumber(blockNumber);
+    }
+} 

@@ -1,0 +1,226 @@
+package com.bloominggrace.governance.governance.domain.model;
+
+import com.bloominggrace.governance.shared.domain.AggregateRoot;
+import com.bloominggrace.governance.shared.domain.UserId;
+
+import lombok.Getter;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.math.BigInteger;
+
+@Entity
+@Table(name = "proposals")
+@Getter
+public class Proposal extends AggregateRoot {
+    
+    @EmbeddedId
+    private ProposalId id;
+    
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "value", column = @Column(name = "creator_id"))
+    })
+    private UserId creatorId;
+    
+    @Column(name = "title", nullable = false)
+    private String title;
+    
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private ProposalStatus status;
+    
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "startDate", column = @Column(name = "voting_start_date")),
+        @AttributeOverride(name = "endDate", column = @Column(name = "voting_end_date"))
+    })
+    private VotingPeriod votingPeriod;
+    
+    @Embedded
+    private VoteResults voteResults;
+    
+    @Column(name = "required_quorum")
+    private long requiredQuorum;
+    
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    
+    // 새로 추가: 트랜잭션 해시 필드
+    @Column(name = "tx_hash")
+    private String txHash;
+    
+    // 새로 추가: 블록체인 제안 개수 필드
+    @Column(name = "proposal_count")
+    private BigInteger proposalCount;
+    
+    @Column(name = "creator_wallet_address")
+    private String creatorWalletAddress;
+
+    protected Proposal() {}
+
+    public Proposal(
+            UserId creatorId,
+            String title,
+            String description,
+            VotingPeriod votingPeriod,
+            long requiredQuorum) {
+        this.id = new ProposalId();
+        this.creatorId = creatorId;
+        this.title = title;
+        this.description = description;
+        this.status = ProposalStatus.DRAFT;
+        this.votingPeriod = votingPeriod;
+        this.voteResults = new VoteResults();
+        this.requiredQuorum = requiredQuorum;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.txHash = null;
+        this.proposalCount = null;
+        this.creatorWalletAddress = null;
+    }
+
+    public void activate() {
+        if (this.status != ProposalStatus.DRAFT) {
+            throw new IllegalStateException("Only draft proposals can be activated");
+        }
+        
+        this.status = ProposalStatus.ACTIVE;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void startVoting() {
+        if (this.status != ProposalStatus.ACTIVE) {
+            throw new IllegalStateException("Only active proposals can start voting");
+        }
+        
+        if (!votingPeriod.isVotingActive()) {
+            throw new IllegalStateException("Voting period is not active yet");
+        }
+        
+        this.status = ProposalStatus.VOTING;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void addVote(VoteType voteType, long votingPower) {
+        if (this.status != ProposalStatus.VOTING) {
+            throw new IllegalStateException("Voting is not active for this proposal");
+        }
+        
+        if (votingPeriod.isVotingEnded()) {
+            throw new IllegalStateException("Voting period has ended");
+        }
+        
+        long currentTotal = voteResults.getTotalVotes();
+        long currentYes = voteResults.getYesVotes();
+        long currentNo = voteResults.getNoVotes();
+        long currentAbstain = voteResults.getAbstainVotes();
+        
+        switch (voteType) {
+            case YES:
+                this.voteResults = new VoteResults(currentTotal + votingPower, currentYes + votingPower, currentNo, currentAbstain);
+                break;
+            case NO:
+                this.voteResults = new VoteResults(currentTotal + votingPower, currentYes, currentNo + votingPower, currentAbstain);
+                break;
+            case ABSTAIN:
+                this.voteResults = new VoteResults(currentTotal + votingPower, currentYes, currentNo, currentAbstain + votingPower);
+                break;
+        }
+        
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void endVoting() {
+        if (this.status != ProposalStatus.VOTING) {
+            throw new IllegalStateException("Proposal is not in voting status");
+        }
+        
+        if (!votingPeriod.isVotingEnded()) {
+            throw new IllegalStateException("Voting period has not ended yet");
+        }
+        
+        if (voteResults.hasQuorum(requiredQuorum)) {
+            this.status = voteResults.isPassed() ? ProposalStatus.PASSED : ProposalStatus.REJECTED;
+        } else {
+            this.status = ProposalStatus.REJECTED; // 쿼럼 미달로 거부
+        }
+        
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateTitle(String newTitle) {
+        if (this.status != ProposalStatus.DRAFT) {
+            throw new IllegalStateException("Only draft proposals can be updated");
+        }
+        
+        this.title = newTitle;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateDescription(String newDescription) {
+        if (this.status != ProposalStatus.DRAFT) {
+            throw new IllegalStateException("Only draft proposals can be updated");
+        }
+        
+        this.description = newDescription;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateVotingPeriod(VotingPeriod newVotingPeriod) {
+        this.votingPeriod = newVotingPeriod;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean canVote() {
+        return this.status == ProposalStatus.VOTING && votingPeriod.isVotingActive();
+    }
+
+    public boolean isVotingActive() {
+        return this.status == ProposalStatus.VOTING;
+    }
+
+    public boolean isPassed() {
+        return this.status == ProposalStatus.PASSED;
+    }
+
+    public boolean isRejected() {
+        return this.status == ProposalStatus.REJECTED;
+    }
+
+    /**
+     * 트랜잭션 해시 설정
+     */
+    public void setTxHash(String txHash) {
+        this.txHash = txHash;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 블록체인 제안 개수 설정
+     */
+    public void setProposalCount(BigInteger proposalCount) {
+        this.proposalCount = proposalCount;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 제안자 지갑 주소 설정
+     */
+    public void setCreatorWalletAddress(String creatorWalletAddress) {
+        this.creatorWalletAddress = creatorWalletAddress;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Proposal{id=%s, title='%s', status=%s, votingPeriod=%s, voteResults=%s}",
+                           id, title, status, votingPeriod, voteResults);
+    }
+} 

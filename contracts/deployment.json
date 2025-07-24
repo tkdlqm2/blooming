@@ -1,0 +1,9 @@
+{
+  "network": "sepolia",
+  "deployer": "0x55D5c49e36f8A89111687C9DC8355121068f0cD8",
+  "contracts": {
+    "GovernanceToken": "0xeafF00556BC06464511319dAb26D6CAC148b89d0",
+    "GovernanceContract": "0xA8B86ecf2d57F7b53312Ae5ecb3215C698550Afd"
+  },
+  "timestamp": "2025-07-19T13:27:08.226Z"
+}
