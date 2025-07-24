@@ -2,6 +2,8 @@ package com.bloominggrace.governance.wallet.domain.service;
 
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.util.Base58Utils;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 import java.math.BigInteger;
 import java.security.SecureRandom;
@@ -183,21 +185,10 @@ public class KeyPairProvider {
     /**
      * Result class containing the generated key pair and address.
      */
+    @Data
+    @AllArgsConstructor
     public static class KeyPairResult {
         private final String privateKey;
         private final String address;
-        
-        public KeyPairResult(String privateKey, String address) {
-            this.privateKey = privateKey;
-            this.address = address;
-        }
-        
-        public String getPrivateKey() {
-            return privateKey;
-        }
-        
-        public String getAddress() {
-            return address;
-        }
     }
 } 

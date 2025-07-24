@@ -1,9 +1,13 @@
 package com.bloominggrace.governance.shared.domain;
 
 import jakarta.persistence.MappedSuperclass;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.util.UUID;
 
 @MappedSuperclass
+@EqualsAndHashCode
+@ToString
 public abstract class EntityId {
     protected UUID value;
 
@@ -18,23 +22,5 @@ public abstract class EntityId {
 
     public UUID getValue() {
         return value;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
-        EntityId entityId = (EntityId) obj;
-        return value.equals(entityId.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return value.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return value.toString();
     }
 } 

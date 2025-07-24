@@ -2,6 +2,7 @@ package com.bloominggrace.governance.token.domain.model;
 
 import com.bloominggrace.governance.shared.domain.ValueObject;
 import com.bloominggrace.governance.shared.domain.UserId;
+import lombok.Getter;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "token_transactions")
+@Getter
 public class TokenTransaction extends ValueObject {
     
     @EmbeddedId
@@ -64,56 +66,14 @@ public class TokenTransaction extends ValueObject {
         this.status = TokenTransactionStatus.PENDING;
     }
 
-    public TokenTransactionId getId() {
-        return id;
-    }
-
-    public UserId getUserId() {
-        return userId;
-    }
-
-    public String getWalletAddress() {
-        return walletAddress;
-    }
-
-    public TokenTransactionType getTransactionType() {
-        return transactionType;
-    }
-
-    public TokenAmount getAmount() {
-        return amount;
-    }
-
-    public String getTransactionSignature() {
-        return transactionSignature;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public TokenTransactionStatus getStatus() {
-        return status;
-    }
-
     public void confirm(String transactionSignature) {
-        if (this.status != TokenTransactionStatus.PENDING) {
-            throw new IllegalStateException("Transaction is not in pending status");
-        }
         this.transactionSignature = transactionSignature;
         this.status = TokenTransactionStatus.CONFIRMED;
     }
 
     public void fail(String reason) {
-        if (this.status != TokenTransactionStatus.PENDING) {
-            throw new IllegalStateException("Transaction is not in pending status");
-        }
-        this.description = this.description + " - Failed: " + reason;
         this.status = TokenTransactionStatus.FAILED;
+        // reason을 저장할 필드가 있다면 여기에 저장
     }
 
     @Override
@@ -132,6 +92,6 @@ public class TokenTransaction extends ValueObject {
     @Override
     public String toString() {
         return String.format("TokenTransaction{id=%s, userId=%s, type=%s, amount=%s, status=%s}",
-                           id, userId, transactionType, amount, status);
+            id, userId, transactionType, amount, status);
     }
 } 

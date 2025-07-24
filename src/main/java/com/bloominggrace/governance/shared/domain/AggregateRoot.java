@@ -1,8 +1,10 @@
 package com.bloominggrace.governance.shared.domain;
 
+import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
 public abstract class AggregateRoot {
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
@@ -14,7 +16,5 @@ public abstract class AggregateRoot {
         return new ArrayList<>(domainEvents);
     }
 
-    public void clearDomainEvents() {
-        domainEvents.clear();
-    }
+
 }

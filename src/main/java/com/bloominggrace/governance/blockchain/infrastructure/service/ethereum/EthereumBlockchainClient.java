@@ -1,11 +1,9 @@
 package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum;
 
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
-import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcError;
-import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcRequest;
-import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto.EthereumRpcResponse;
-import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
-import com.bloominggrace.governance.shared.util.HexUtils;
+import com.bloominggrace.governance.blockchain.infrastructure.service.dto.BlockchainRpcRequest;
+import com.bloominggrace.governance.blockchain.infrastructure.service.dto.BlockchainRpcResponse;
+import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
 import com.bloominggrace.governance.shared.util.JsonRpcClient;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -13,19 +11,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.web3j.abi.FunctionEncoder;
-import org.web3j.abi.datatypes.Function;
-import org.web3j.abi.datatypes.generated.Uint256;
-import org.web3j.crypto.Credentials;
-import org.web3j.crypto.RawTransaction;
-import org.web3j.crypto.TransactionEncoder;
-import org.web3j.utils.Numeric;
 
-import java.io.IOException;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -39,13 +27,6 @@ public class EthereumBlockchainClient implements BlockchainClient {
     private final JsonRpcClient jsonRpcClient;
     private final ObjectMapper objectMapper;
     private final String rpcUrl;
-    
-    @Value("${blockchain.ethereum.network-id:11155111}")
-    private String networkId;
-    
-    @Value("${blockchain.ethereum.chain-id:11155111}")
-    private String chainId;
-
 
     public EthereumBlockchainClient(@Value("${blockchain.ethereum.rpc-url}") String rpcUrl,
                                    JsonRpcClient jsonRpcClient,
@@ -65,8 +46,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getLatestBlockHash() {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByNumber", Arrays.asList("latest", false));
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER, Arrays.asList(EthereumConstants.RpcParams.LATEST, EthereumConstants.RpcParams.EXCLUDE_TRANSACTIONS));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get latest block hash: {}", response.getError().getMessage());
@@ -90,8 +71,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getGasPrice() {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_gasPrice", Arrays.asList());
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_GAS_PRICE, Arrays.asList());
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get gas price: {}", response.getError().getMessage());
@@ -115,8 +96,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
                 "data", data
             );
             
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_estimateGas", Arrays.asList(transaction));
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.ESTIMATE_GAS, Arrays.asList(transaction));
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Gas estimation error: {}", response.getError().getMessage());
@@ -134,15 +115,14 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getNonce(String address) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionCount", Arrays.asList(address, "pending"));
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_TRANSACTION_COUNT, Arrays.asList(address, EthereumConstants.RpcParams.PENDING));
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get nonce: {}", response.getError().getMessage());
                 return "0";
             }
             
-            // Hex를 decimal로 변환
             return new BigInteger(response.getResult().substring(2), 16).toString();
         } catch (Exception e) {
             log.error("Error getting nonce for address: {}", address, e);
@@ -153,8 +133,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getBalance(String address) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBalance", Arrays.asList(address, "latest"));
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BALANCE, Arrays.asList(address, EthereumConstants.RpcParams.LATEST));
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get balance: {}", response.getError().getMessage());
@@ -178,7 +158,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             log.info("RPC URL: {}", rpcUrl);
             
             // ERC20 balanceOf 함수 호출
-            String balanceOfData = "0x70a08231" + padLeft(walletAddress.substring(2), 64);
+            String balanceOfData = EthereumConstants.Token.BALANCE_OF_SELECTOR + padLeft(walletAddress.substring(2), 64);
             log.info("BalanceOf Data: {}", balanceOfData);
             
             Map<String, String> transaction = Map.of(
@@ -187,7 +167,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             );
             log.info("RPC Transaction: {}", transaction);
             
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_call", Arrays.asList(transaction, "latest"));
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.CALL, Arrays.asList(transaction, EthereumConstants.RpcParams.LATEST));
             log.info("RPC Request: {}", request);
             
             // 직접 curl 명령어 출력 (디버깅용)
@@ -197,7 +177,7 @@ public class EthereumBlockchainClient implements BlockchainClient {
             );
             log.info("Equivalent curl command: {}", curlCommand);
             
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             log.info("RPC Response: {}", response);
             
             if (response.hasError()) {
@@ -235,9 +215,9 @@ public class EthereumBlockchainClient implements BlockchainClient {
             log.info("=== Ethereum Transaction Broadcast Debug ===");
             log.info("Broadcasting Ethereum raw transaction: {}", signedTransaction);
             log.info("RPC URL: {}", rpcUrl);
-            log.info("Network ID: {}", networkId);
-            log.info("Chain ID: {}", chainId);
-            
+            log.info("Network ID: {}", EthereumConstants.Network.NETWORK_NAME);
+            log.info("Chain ID: {}", EthereumConstants.Network.CHAIN_ID);
+
             // 서명된 트랜잭션 형식 검증
             if (signedTransaction == null || signedTransaction.trim().isEmpty()) {
                 log.error("Signed transaction is null or empty");
@@ -251,12 +231,11 @@ public class EthereumBlockchainClient implements BlockchainClient {
             
             log.info("Signed transaction format validation passed");
 
-            // 실제 RPC 호출 코드 (운영 환경에서 사용)
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_sendRawTransaction", Arrays.asList(signedTransaction));
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.SEND_RAW_TRANSACTION, Arrays.asList(signedTransaction));
             log.info("RPC Request: {}", request);
             
             log.info("Sending request to RPC endpoint...");
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             log.info("RPC Response: {}", response);
             
             if (response.hasError()) {
@@ -285,8 +264,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getTransactionStatus(String transactionHash) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionReceipt", Arrays.asList(transactionHash));
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_TRANSACTION_RECEIPT, Arrays.asList(transactionHash));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get transaction status: {}", response.getError().getMessage());
@@ -312,8 +291,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getTransactionReceipt(String transactionHash) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getTransactionReceipt", Arrays.asList(transactionHash));
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_TRANSACTION_RECEIPT, Arrays.asList(transactionHash));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get transaction receipt: {}", response.getError().getMessage());
@@ -330,8 +309,8 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getBlockByHash(String blockHash) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByHash", Arrays.asList(blockHash, false));
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_HASH, Arrays.asList(blockHash, false));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
             
             if (response.hasError()) {
                 log.error("Failed to get block by hash: {}", response.getError().getMessage());
@@ -348,14 +327,15 @@ public class EthereumBlockchainClient implements BlockchainClient {
     @Override
     public String getBlockByNumber(String blockNumber) {
         try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_getBlockByNumber", Arrays.asList(blockNumber, false));
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {});
-            
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER, Arrays.asList(blockNumber, false));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {
+            });
+
             if (response.hasError()) {
                 log.error("Failed to get block by number: {}", response.getError().getMessage());
                 return null;
             }
-            
+
             return objectMapper.writeValueAsString(response.getResult());
         } catch (Exception e) {
             log.error("Error getting block by number: {}", blockNumber, e);
@@ -364,42 +344,14 @@ public class EthereumBlockchainClient implements BlockchainClient {
     }
     
     @Override
-    public String getNetworkStatus() {
-        try {
-            EthereumRpcRequest request = EthereumRpcRequest.of("net_listening", Arrays.asList());
-            EthereumRpcResponse<Boolean> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<Boolean>>() {});
-            
-            if (response.hasError()) {
-                log.error("Failed to get network status: {}", response.getError().getMessage());
-                return "UNHEALTHY";
-            }
-            
-            return response.getResult() ? "HEALTHY" : "UNHEALTHY";
-        } catch (Exception e) {
-            log.error("Error getting network status", e);
-            return "UNHEALTHY";
-        }
-    }
-    
-    @Override
-    public String getNetworkId() {
-        return networkId;
-    }
-    
-    @Override
-    public String getChainId() {
-        return chainId;
-    }
-    
-    @Override
     public String getLatestBlockNumber() {
         try {
             log.info("Requesting latest block number from: {}", rpcUrl);
             
-            EthereumRpcRequest request = EthereumRpcRequest.of("eth_blockNumber", Arrays.asList());
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_NUMBER, Arrays.asList());
             log.debug("Sending request: {}", request);
             
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<EthereumRpcResponse<String>>() {});
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
             log.debug("Received response: {}", response);
             
             if (response.hasError()) {
@@ -423,129 +375,89 @@ public class EthereumBlockchainClient implements BlockchainClient {
     }
 
     @Override
-    public String calculateTransactionFee(String gasPrice, String gasLimit) {
+    public Long getBlockTimestamp(String blockNumber) {
         try {
-            BigInteger price = new BigInteger(gasPrice);
-            BigInteger limit = new BigInteger(gasLimit);
-            BigInteger fee = price.multiply(limit);
-            return fee.toString();
+            log.info("Getting block timestamp for block: {}", blockNumber);
+            
+            // blockNumber가 null이면 최신 블록 사용
+            String targetBlock = (blockNumber == null || blockNumber.isEmpty()) ? 
+                EthereumConstants.RpcParams.LATEST : blockNumber;
+            
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.GET_BLOCK_BY_NUMBER,
+                Arrays.asList(targetBlock, EthereumConstants.RpcParams.EXCLUDE_TRANSACTIONS));
+            BlockchainRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(rpcUrl, request,
+                new TypeReference<BlockchainRpcResponse<Map<String, Object>>>() {});
+            
+            if (response.hasError()) {
+                log.error("Failed to get block timestamp: {}", response.getError().getMessage());
+                return null;
+            }
+            
+            Map<String, Object> block = response.getResult();
+            if (block == null) {
+                log.error("Received null block from Ethereum RPC");
+                return null;
+            }
+            
+            String timestampHex = (String) block.get("timestamp");
+            if (timestampHex == null) {
+                log.error("Block timestamp is null");
+                return null;
+            }
+            
+            // Hex를 decimal로 변환하여 Unix timestamp 반환
+            Long timestamp = new BigInteger(timestampHex.substring(2), 16).longValue();
+            log.info("Block timestamp: {} (block: {})", timestamp, targetBlock);
+            return timestamp;
+            
         } catch (Exception e) {
-            log.error("Error calculating transaction fee", e);
-            return "0";
+            log.error("Error getting block timestamp: {}", e.getMessage(), e);
+            return null;
         }
     }
 
+
+
+    private String padLeft(String value, int length) {
+        return String.format("%" + length + "s", value).replace(' ', '0');
+    }
+
+    @Override
     public BigInteger getProposalCount() {
         try {
-            log.info("Calling proposalCount() function on governance contract: {}", BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS);
-
+            log.info("Calling proposalCount() function on governance contract: {}", EthereumConstants.Contracts.GOVERNANCE_CONTRACT_ADDRESS);
+            
             // 1. proposalCount() 함수 정의
-            Function function = new Function(
-                "proposalCount",                              // 함수명
-                Collections.emptyList(),                      // 입력 파라미터 없음
-                Arrays.asList(new org.web3j.abi.TypeReference<Uint256>() {})
+            String functionData = "0x" + "da35c664"; // proposalCount() 함수의 Method ID
+            
+            // 2. eth_call RPC 요청 생성
+            Map<String, String> transaction = Map.of(
+                "to", EthereumConstants.Contracts.GOVERNANCE_CONTRACT_ADDRESS,
+                "data", functionData
             );
-
-            // 2. 함수 호출 데이터 인코딩
-            String encodedFunction = FunctionEncoder.encode(function);
-            log.debug("Encoded function data: {}", encodedFunction);
-
-            // 3. eth_call RPC 요청 생성
-            EthereumRpcRequest request = EthereumRpcRequest.of(
-                "eth_call",
-                Arrays.asList(
-                    Map.of(
-                        "to", BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS,
-                        "data", encodedFunction
-                    ),
-                    "latest"
-                )
-            );
-
-            // 4. RPC 요청 전송
-            EthereumRpcResponse<String> response = jsonRpcClient.sendRequest(
-                rpcUrl,
-                request,
-                new TypeReference<EthereumRpcResponse<String>>() {}
-            );
-
-            // 5. 응답 확인
+            
+            BlockchainRpcRequest request = BlockchainRpcRequest.of(EthereumConstants.RpcMethods.CALL, Arrays.asList(transaction, EthereumConstants.RpcParams.LATEST));
+            BlockchainRpcResponse<String> response = jsonRpcClient.sendRequest(rpcUrl, request, new TypeReference<BlockchainRpcResponse<String>>() {});
+            
             if (response.hasError()) {
                 log.error("Error calling proposalCount(): {}", response.getError().getMessage());
                 return BigInteger.ZERO;
             }
-
-            // 6. 결과 확인
+            
             String result = response.getResult();
             if (result == null || result.equals("0x")) {
                 log.warn("Empty result from proposalCount()");
                 return BigInteger.ZERO;
             }
-
-            // 7. hex 결과를 BigInteger로 변환
+            
             BigInteger proposalCount = new BigInteger(result.substring(2), 16);
             log.info("Successfully retrieved proposal count: {}", proposalCount);
-
+            
             return proposalCount;
-
+            
         } catch (Exception e) {
             log.error("Error calling proposalCount() function: {}", e.getMessage(), e);
             return BigInteger.ZERO;
         }
-    }
-
-    @Override
-    public Long getBlockTimestamp(String blockNumber) {
-        try {
-            // blockNumber가 null이면 "latest" 사용
-            String targetBlock = (blockNumber != null) ? blockNumber : "latest";
-            log.info("Getting block timestamp for block: {}", targetBlock);
-
-            // eth_getBlockByNumber RPC 요청 생성
-            EthereumRpcRequest request = EthereumRpcRequest.of(
-                "eth_getBlockByNumber",
-                Arrays.asList(targetBlock, false) // false: 전체 블록 정보가 아닌 기본 정보만
-            );
-
-            // RPC 요청 전송
-            EthereumRpcResponse<Map<String, Object>> response = jsonRpcClient.sendRequest(
-                rpcUrl,
-                request,
-                new TypeReference<EthereumRpcResponse<Map<String, Object>>>() {}
-            );
-
-            // 응답 확인
-            if (response.hasError()) {
-                log.error("Error getting block timestamp: {}", response.getError().getMessage());
-                return null;
-            }
-
-            Map<String, Object> blockInfo = response.getResult();
-            if (blockInfo == null) {
-                log.error("Received null block info from Ethereum RPC");
-                return null;
-            }
-
-            // timestamp 필드 추출 (hex 문자열)
-            String timestampHex = (String) blockInfo.get("timestamp");
-            if (timestampHex == null) {
-                log.error("Block info does not contain timestamp field");
-                return null;
-            }
-
-            // hex를 Long으로 변환
-            Long timestamp = Long.parseLong(timestampHex.substring(2), 16);
-            log.info("Successfully retrieved block timestamp: {} for block: {}", timestamp, targetBlock);
-
-            return timestamp;
-
-        } catch (Exception e) {
-            log.error("Error getting block timestamp for block {}: {}", blockNumber, e.getMessage(), e);
-            return null;
-        }
-    }
-
-    private String padLeft(String value, int length) {
-        return String.format("%" + length + "s", value).replace(' ', '0');
     }
 } 

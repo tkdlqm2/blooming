@@ -1,6 +1,8 @@
 package com.bloominggrace.governance.token.application.service;
 
 import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.domain.constants.SolanaConstants;
 import com.bloominggrace.governance.token.application.dto.CreateTokenAccountRequest;
 import com.bloominggrace.governance.token.application.dto.TokenAccountDto;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
@@ -9,7 +11,7 @@ import com.bloominggrace.governance.user.application.service.UserService;
 import com.bloominggrace.governance.wallet.application.service.WalletApplicationService;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,40 +29,13 @@ import java.math.BigDecimal;
 @Slf4j
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class TokenAccountApplicationService {
     
     private final TokenAccountRepository tokenAccountRepository;
     private final WalletApplicationService walletApplicationService;
     private final UserService userService;
-    
-    // 토큰 설정 주입
-    @Value("${token.ethereum.contract-address}")
-    private String ethereumContractAddress;
-    
-    @Value("${token.ethereum.symbol}")
-    private String ethereumSymbol;
-    
-    @Value("${token.solana.contract-address}")
-    private String solanaContractAddress;
-    
-    @Value("${token.solana.symbol}")
-    private String solanaSymbol;
-    
-    public TokenAccountApplicationService(TokenAccountRepository tokenAccountRepository,
-                                        WalletApplicationService walletApplicationService,
-                                        UserService userService) {
-        this.tokenAccountRepository = tokenAccountRepository;
-        this.walletApplicationService = walletApplicationService;
-        this.userService = userService;
-        
-        // 설정값 로그 출력
-        log.info("TokenAccountApplicationService initialized with:");
-        log.info("  ethereumContractAddress: {}", ethereumContractAddress);
-        log.info("  ethereumSymbol: {}", ethereumSymbol);
-        log.info("  solanaContractAddress: {}", solanaContractAddress);
-        log.info("  solanaSymbol: {}", solanaSymbol);
-    }
-    
+
     /**
      * 새로운 토큰 계정을 생성합니다.
      */
@@ -113,31 +88,7 @@ public class TokenAccountApplicationService {
             .map(this::convertToDto)
             .collect(Collectors.toList());
     }
-    
-    /**
-     * 사용자 ID, 네트워크, 컨트랙트로 특정 토큰 계정을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public Optional<TokenAccountDto> findByUserIdAndNetworkAndContract(String userId, NetworkType network, String contract) {
-        Optional<TokenAccount> tokenAccount = tokenAccountRepository.findByUserIdAndNetworkAndContract(
-            new UserId(UUID.fromString(userId)), network, contract);
-        
-        return tokenAccount.map(this::convertToDto);
-    }
-    
-    /**
-     * 사용자 ID와 네트워크로 토큰 계정들을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public List<TokenAccountDto> findByUserIdAndNetwork(String userId, NetworkType network) {
-        List<TokenAccount> tokenAccounts = tokenAccountRepository.findByUserIdAndNetwork(
-            new UserId(UUID.fromString(userId)), network);
-        
-        return tokenAccounts.stream()
-            .map(this::convertToDto)
-            .collect(Collectors.toList());
-    }
-    
+
     /**
      * 지갑 주소로 모든 토큰 계정을 조회합니다.
      */
@@ -149,48 +100,6 @@ public class TokenAccountApplicationService {
             .map(this::convertToDto)
             .collect(Collectors.toList());
     }
-    
-    /**
-     * 지갑 주소, 네트워크, 컨트랙트로 특정 토큰 계정을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public Optional<TokenAccountDto> findByWalletAddressAndNetworkAndContract(String walletAddress, NetworkType network, String contract) {
-        Optional<TokenAccount> tokenAccount = tokenAccountRepository.findByWalletAddressAndNetworkAndContract(
-            walletAddress, network, contract);
-        
-        return tokenAccount.map(this::convertToDto);
-    }
-    
-    /**
-     * 지갑 ID로 모든 토큰 계정을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public List<TokenAccountDto> findByWalletId(UUID walletId) {
-        Wallet wallet = walletApplicationService.findById(walletId)
-            .orElseThrow(() -> new IllegalArgumentException("Wallet not found with id: " + walletId));
-        
-        List<TokenAccount> tokenAccounts = tokenAccountRepository.findByWallet(wallet);
-        
-        return tokenAccounts.stream()
-            .map(this::convertToDto)
-            .collect(Collectors.toList());
-    }
-    
-    /**
-     * 지갑 ID와 네트워크로 토큰 계정을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public List<TokenAccountDto> findByWalletIdAndNetwork(UUID walletId, NetworkType network) {
-        Wallet wallet = walletApplicationService.findById(walletId)
-            .orElseThrow(() -> new IllegalArgumentException("Wallet not found with id: " + walletId));
-        
-        List<TokenAccount> tokenAccounts = tokenAccountRepository.findByWalletAndNetwork(wallet, network);
-        
-        return tokenAccounts.stream()
-            .map(this::convertToDto)
-            .collect(Collectors.toList());
-    }
-    
     /**
      * 지갑 주소와 네트워크로 토큰 계정을 조회합니다.
      */
@@ -225,59 +134,7 @@ public class TokenAccountApplicationService {
         
         tokenAccountRepository.delete(id);
     }
-    
-    /**
-     * 토큰 계정을 조회하거나 없으면 생성합니다.
-     */
-    public TokenAccountDto findOrCreateTokenAccount(String userId, String walletAddress, NetworkType network, String contract, String symbol) {
-        try {
-            // 먼저 기존 토큰 계정이 있는지 확인
-            UUID userIdUuid = UUID.fromString(userId);
-            Optional<TokenAccount> existingTokenAccount = tokenAccountRepository.findByUserIdAndNetworkAndContract(
-                new UserId(userIdUuid), network, contract);
-            
-            if (existingTokenAccount.isPresent()) {
-                return convertToDto(existingTokenAccount.get());
-            }
-            
-            // 없으면 새로 생성
-            CreateTokenAccountRequest request = new CreateTokenAccountRequest();
-            request.setUserId(userId);
-            request.setWalletAddress(walletAddress);
-            request.setNetwork(network);
-            request.setContract(contract);
-            request.setSymbol(symbol);
-            
-            return createTokenAccount(request);
-        } catch (Exception e) {
-            log.error("Error in findOrCreateTokenAccount: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to find or create token account: " + e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * 네트워크별 기본 토큰 계정을 조회하거나 생성합니다.
-     */
-    public TokenAccountDto findOrCreateDefaultTokenAccount(String userId, String walletAddress, NetworkType network) {
-        String contractAddress;
-        String symbol;
-        
-        switch (network) {
-            case ETHEREUM:
-                contractAddress = BlockchainMetadata.Ethereum.ERC20_CONTRACT_ADDRESS;
-                symbol = BlockchainMetadata.Ethereum.ERC20_SYMBOL;
-                break;
-            case SOLANA:
-                contractAddress = BlockchainMetadata.Solana.SPL_TOKEN_MINT_ADDRESS;
-                symbol = BlockchainMetadata.Solana.SPL_TOKEN_SYMBOL;
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported network type: " + network);
-        }
-        
-        return findOrCreateTokenAccount(userId, walletAddress, network, contractAddress, symbol);
-    }
-    
+
     /**
      * TokenAccount 엔티티를 직접 반환하는 메서드 (내부 사용)
      */

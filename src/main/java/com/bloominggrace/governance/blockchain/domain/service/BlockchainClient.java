@@ -93,39 +93,13 @@ public interface BlockchainClient {
      * @return 블록 정보
      */
     String getBlockByNumber(String blockNumber);
-    
-    /**
-     * 네트워크 상태를 확인합니다.
-     * @return 네트워크 상태 (syncing, synced 등)
-     */
-    String getNetworkStatus();
-    
-    /**
-     * 네트워크 ID를 조회합니다.
-     * @return 네트워크 ID
-     */
-    String getNetworkId();
-    
-    /**
-     * 체인 ID를 조회합니다.
-     * @return 체인 ID
-     */
-    String getChainId();
-    
+
     /**
      * 최신 블록 번호를 조회합니다.
      * @return 최신 블록 번호
      */
     String getLatestBlockNumber();
-    
 
-    /**
-     * 트랜잭션 수수료를 계산합니다.
-     * @param gasPrice 가스 가격
-     * @param gasLimit 가스 한도
-     * @return 트랜잭션 수수료
-     */
-    String calculateTransactionFee(String gasPrice, String gasLimit);
 
     BigInteger getProposalCount();
     

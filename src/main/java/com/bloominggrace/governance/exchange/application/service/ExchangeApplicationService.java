@@ -7,13 +7,14 @@ import com.bloominggrace.governance.exchange.infrastructure.repository.ExchangeR
 import com.bloominggrace.governance.point.application.service.PointManagementService;
 import com.bloominggrace.governance.point.domain.model.PointAmount;
 import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
+import com.bloominggrace.governance.shared.domain.constants.SolanaConstants;
 import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
 import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
 import com.bloominggrace.governance.token.application.service.TokenAccountApplicationService;
 import com.bloominggrace.governance.token.domain.model.TokenAccount;
 import com.bloominggrace.governance.token.infrastructure.repository.TokenAccountRepository;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -134,9 +135,9 @@ public class ExchangeApplicationService {
     private String getTokenContractAddress(NetworkType networkType) {
         switch (networkType) {
             case ETHEREUM:
-                return BlockchainMetadata.Ethereum.ERC20_CONTRACT_ADDRESS;
+                return EthereumConstants.Contracts.ERC20_CONTRACT_ADDRESS;
             case SOLANA:
-                return BlockchainMetadata.Solana.SPL_TOKEN_MINT_ADDRESS;
+                return SolanaConstants.Token.SPL_TOKEN_MINT_ADDRESS;
             default:
                 throw new IllegalArgumentException("Unsupported network type: " + networkType);
         }
@@ -248,9 +249,9 @@ public class ExchangeApplicationService {
     private String getTokenSymbol(NetworkType networkType) {
         switch (networkType) {
             case ETHEREUM:
-                return BlockchainMetadata.Ethereum.ERC20_SYMBOL;
+                return EthereumConstants.Token.ERC20_SYMBOL;
             case SOLANA:
-                return BlockchainMetadata.Solana.SPL_TOKEN_SYMBOL;
+                return SolanaConstants.Token.SPL_TOKEN_SYMBOL;
             default:
                 throw new IllegalArgumentException("Unsupported network type: " + networkType);
         }

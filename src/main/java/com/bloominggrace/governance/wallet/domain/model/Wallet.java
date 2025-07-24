@@ -60,16 +60,4 @@ public class Wallet extends AggregateRoot {
     public String getEncryptedPrivateKey() {
         return encryptedPrivateKey;
     }
-
-    public void addTokenAccount(TokenAccount tokenAccount) {
-        this.tokenAccounts.add(tokenAccount);
-    }
-
-    public void removeTokenAccount(TokenAccount tokenAccount) {
-        this.tokenAccounts.remove(tokenAccount);
-    }
-
-    public List<TokenAccount> getTokenAccounts() {
-        return new ArrayList<>(tokenAccounts);
-    }
 } 

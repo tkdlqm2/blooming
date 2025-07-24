@@ -17,9 +17,6 @@ import java.math.BigInteger;
 public class BlockchainApplicationService {
 
     private final BlockchainClientFactory blockchainClientFactory;
-    private final WalletServiceFactory walletServiceFactory;
-    private final AdminWalletService adminWalletService;
-
     /**
      * 잔액을 조회합니다.
      */
@@ -77,22 +74,6 @@ public class BlockchainApplicationService {
     }
 
     /**
-     * 네트워크 연결 상태를 확인합니다.
-     */
-    public boolean isNetworkConnected(NetworkType networkType) {
-        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
-        return "SYNCED".equals(blockchainClient.getNetworkStatus());
-    }
-
-    /**
-     * 네트워크 상태를 조회합니다.
-     */
-    public String getNetworkStatus(NetworkType networkType) {
-        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
-        return blockchainClient.getNetworkStatus();
-    }
-
-    /**
      * 최신 블록 번호를 조회합니다.
      */
     public String getLatestBlockNumber(NetworkType networkType) {
@@ -122,36 +103,5 @@ public class BlockchainApplicationService {
     public String getBlockByNumber(String blockNumber, NetworkType networkType) {
         BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
         return blockchainClient.getBlockByNumber(blockNumber);
-    }
-
-    /**
-     * 네트워크 ID를 조회합니다.
-     */
-    public String getNetworkId(NetworkType networkType) {
-        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
-        return blockchainClient.getNetworkId();
-    }
-
-    /**
-     * 체인 ID를 조회합니다.
-     */
-    public String getChainId(NetworkType networkType) {
-        BlockchainClient client = blockchainClientFactory.getClient(networkType);
-        return client.getChainId();
-    }
-
-    /**
-     * 트랜잭션 수수료를 계산합니다.
-     */
-    public String calculateTransactionFee(String gasPrice, String gasLimit, NetworkType networkType) {
-        BlockchainClient blockchainClient = blockchainClientFactory.getClient(networkType);
-        return blockchainClient.calculateTransactionFee(gasPrice, gasLimit);
-    }
-
-    /**
-     * 주소 유효성을 검증합니다.
-     */
-    public boolean validateAddress(String address, NetworkType networkType) {
-        return walletServiceFactory.getWalletService(networkType).isValidAddress(address);
     }
 } 

@@ -1,4 +1,4 @@
-package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto;
+package com.bloominggrace.governance.blockchain.infrastructure.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class EthereumRpcResponse<T> {
+public class BlockchainRpcResponse<T> {
     
     @JsonProperty("jsonrpc")
     private String jsonrpc;
@@ -20,7 +20,7 @@ public class EthereumRpcResponse<T> {
     private T result;
     
     @JsonProperty("error")
-    private EthereumRpcError error;
+    private BlockchainRpcError error;
     
     public boolean hasError() {
         return error != null;

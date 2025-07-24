@@ -73,12 +73,5 @@ public class JwtService {
         return claims.get("role", String.class);
     }
 
-    public boolean isTokenExpired(String token) {
-        try {
-            Claims claims = parseToken(token);
-            return claims.getExpiration().before(new Date());
-        } catch (Exception e) {
-            return true;
-        }
-    }
+
 } 

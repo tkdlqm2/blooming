@@ -80,113 +80,13 @@ public class SignedTransaction<T> {
         this.s = s;
     }
     
-    /**
-     * 브로드캐스트 후 트랜잭션 해시 설정
-     */
-    public SignedTransaction withTransactionHash(String transactionHash) {
-        return new SignedTransaction(
-            this.transactionBody,
-            this.signature,
-            this.signerAddress
-        ).withStatus(TransactionStatus.PENDING);
-    }
+
     
-    /**
-     * 트랜잭션 상태 업데이트
-     */
-    public SignedTransaction withStatus(TransactionStatus status) {
-        return new SignedTransaction(
-            this.transactionBody,
-            this.signature,
-            this.signerAddress
-        );
-    }
+
     
-    /**
-     * 서명된 트랜잭션을 바이트 배열로 변환 (브로드캐스트용)
-     * 네트워크별로 다른 형식 사용
-     */
-    public byte[] toRawTransaction() {
-        // 기본 구현 (기존 호환성)
-        byte[] bodyBytes = transactionBody.toBytes();
-        byte[] rawTransaction = new byte[bodyBytes.length + signature.length];
-        
-        System.arraycopy(bodyBytes, 0, rawTransaction, 0, bodyBytes.length);
-        System.arraycopy(signature, 0, rawTransaction, bodyBytes.length, signature.length);
-        
-        return rawTransaction;
-    }
+
     
-    /**
-     * 서명된 트랜잭션이 유효한지 확인
-     */
-    public boolean isValid() {
-        return transactionBody != null && 
-               signature != null && 
-               signature.length > 0 && 
-               signerAddress != null && 
-               !signerAddress.isEmpty();
-    }
+
     
-    /**
-     * 정책 제안 생성용 서명된 트랜잭션 생성
-     */
-    public static <T> SignedTransaction<T> createProposalTransaction(
-            String fromAddress,
-            String proposalId,
-            String title,
-            String description,
-            String proposalFee,
-            String networkType,
-            byte[] signature,
-            T networkSpecificData) {
-        
-        // 새로운 통합 메서드를 사용하여 TransactionBody 생성
-        TransactionRequest.ProposalData proposalData = new TransactionRequest.ProposalData(
-            proposalId, title, description, new java.math.BigDecimal(proposalFee)
-        );
-        
-        // TransactionBodyFactory를 통해 생성 (간단한 구현)
-        TransactionBody<T> transactionBody = new TransactionBody<>(
-            TransactionBody.TransactionType.PROPOSAL_CREATE,
-            fromAddress,
-            null,
-            proposalData.toString(),
-            networkType,
-            networkSpecificData
-        );
-        
-        return new SignedTransaction<>(transactionBody, signature, fromAddress);
-    }
-    
-    /**
-     * 투표용 서명된 트랜잭션 생성
-     */
-    public static <T> SignedTransaction<T> createVoteTransaction(
-            String fromAddress,
-            String proposalId,
-            String voteType,
-            String votingPower,
-            String reason,
-            String networkType,
-            byte[] signature,
-            T networkSpecificData) {
-        
-        // 새로운 통합 메서드를 사용하여 TransactionBody 생성
-        TransactionRequest.VoteData voteData = new TransactionRequest.VoteData(
-            proposalId, voteType, new java.math.BigDecimal(votingPower), reason
-        );
-        
-        // TransactionBodyFactory를 통해 생성 (간단한 구현)
-        TransactionBody<T> transactionBody = new TransactionBody<>(
-            TransactionBody.TransactionType.PROPOSAL_VOTE,
-            fromAddress,
-            null,
-            voteData.toString(),
-            networkType,
-            networkSpecificData
-        );
-        
-        return new SignedTransaction<>(transactionBody, signature, fromAddress);
-    }
+
 } 

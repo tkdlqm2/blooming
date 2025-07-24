@@ -2,7 +2,6 @@ package com.bloominggrace.governance.blockchain.infrastructure.controller;
 
 import com.bloominggrace.governance.blockchain.application.service.BlockchainApplicationService;
 import com.bloominggrace.governance.blockchain.infrastructure.controller.dto.BlockchainResponse;
-import com.bloominggrace.governance.shared.infrastructure.service.JwtService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,10 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
 import java.util.Optional;
-import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrchestrator;
 
 @RestController
 @RequestMapping("/api/blockchain/{networkType}")
@@ -22,13 +18,11 @@ import com.bloominggrace.governance.shared.infrastructure.service.TransactionOrc
 public class BlockchainController {
 
     private final BlockchainApplicationService blockchainApplicationService;
-    private final JwtService jwtService;
     private final ObjectMapper objectMapper;
-    private final TransactionOrchestrator transactionOrchestrator;
 
     /**
      * Solana JSON-RPC 응답을 파싱하여 실제 결과값만 추출합니다.
-     * 
+     *
      * @param jsonResponse JSON-RPC 응답 문자열
      * @return 파싱된 결과값
      */
@@ -59,6 +53,38 @@ public class BlockchainController {
     }
 
     /**
+     * 공통 응답 처리 메서드
+     */
+    private ResponseEntity<BlockchainResponse<String>> handleResponse(String result, NetworkType networkType) {
+        String parsedResponse = parseResponseByNetwork(result, networkType);
+        return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
+    }
+
+    /**
+     * 공통 에러 처리 메서드
+     */
+    private ResponseEntity<BlockchainResponse<String>> handleError(Exception e) {
+        if (e instanceof IllegalArgumentException) {
+            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
+        }
+        return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
+    }
+
+    /**
+     * 네트워크 타입 변환 및 공통 처리
+     */
+    private ResponseEntity<BlockchainResponse<String>> executeWithNetworkType(String networkType, 
+                                                                             java.util.function.Function<NetworkType, String> operation) {
+        try {
+            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
+            String result = operation.apply(type);
+            return handleResponse(result, type);
+        } catch (Exception e) {
+            return handleError(e);
+        }
+    }
+
+    /**
      * 잔액을 조회합니다.
      * 
      * @param address 지갑 주소
@@ -68,16 +94,8 @@ public class BlockchainController {
     @GetMapping("/balance")
     public ResponseEntity<BlockchainResponse<String>> getBalance(@RequestParam String address,
                                                                 @PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String balance = blockchainApplicationService.getBalance(address, type).toString();
-            String parsedResponse = parseResponseByNetwork(balance, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getBalance(address, type).toString());
     }
 
     /**
@@ -92,16 +110,8 @@ public class BlockchainController {
     public ResponseEntity<BlockchainResponse<String>> getTokenBalance(@RequestParam String walletAddress,
                                                                      @RequestParam String tokenAddress,
                                                                      @PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String balance = blockchainApplicationService.getTokenBalance(walletAddress, tokenAddress, type).toString();
-            String parsedResponse = parseResponseByNetwork(balance, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getTokenBalance(walletAddress, tokenAddress, type).toString());
     }
 
     /**
@@ -160,42 +170,8 @@ public class BlockchainController {
      */
     @GetMapping("/gas-price")
     public ResponseEntity<BlockchainResponse<String>> getGasPrice(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String gasPrice = blockchainApplicationService.getGasPrice(type).toString();
-            String parsedResponse = parseResponseByNetwork(gasPrice, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 가스 한도를 추정합니다.
-     * 
-     * @param fromAddress 발신자 주소
-     * @param toAddress 수신자 주소
-     * @param data 트랜잭션 데이터
-     * @param networkType 네트워크 타입
-     * @return 가스 한도
-     */
-    @GetMapping("/estimate-gas")
-    public ResponseEntity<BlockchainResponse<String>> estimateGas(@RequestParam String fromAddress,
-                                                                 @RequestParam String toAddress,
-                                                                 @RequestParam(required = false) String data,
-                                                                 @PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String gasLimit = blockchainApplicationService.estimateGas(fromAddress, toAddress, data, type);
-            String parsedResponse = parseResponseByNetwork(gasLimit, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getGasPrice(type).toString());
     }
 
     /**
@@ -208,35 +184,8 @@ public class BlockchainController {
     @GetMapping("/nonce")
     public ResponseEntity<BlockchainResponse<String>> getNonce(@RequestParam String address,
                                                               @PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String nonce = blockchainApplicationService.getNonce(address, type);
-            String parsedResponse = parseResponseByNetwork(nonce, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 네트워크 상태를 확인합니다.
-     * 
-     * @param networkType 네트워크 타입
-     * @return 네트워크 상태
-     */
-    @GetMapping("/network-status")
-    public ResponseEntity<BlockchainResponse<String>> getNetworkStatus(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String status = blockchainApplicationService.getNetworkStatus(type);
-            return ResponseEntity.ok(BlockchainResponse.success(status));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getNonce(address, type));
     }
 
     /**
@@ -247,16 +196,8 @@ public class BlockchainController {
      */
     @GetMapping("/latest-block-number")
     public ResponseEntity<BlockchainResponse<String>> getLatestBlockNumber(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String blockNumber = blockchainApplicationService.getLatestBlockNumber(type);
-            String parsedResponse = parseResponseByNetwork(blockNumber, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getLatestBlockNumber(type));
     }
 
     /**
@@ -267,16 +208,8 @@ public class BlockchainController {
      */
     @GetMapping("/latest-block-hash")
     public ResponseEntity<BlockchainResponse<String>> getLatestBlockHash(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String blockHash = blockchainApplicationService.getLatestBlockHash(type);
-            String parsedResponse = parseResponseByNetwork(blockHash, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
+        return executeWithNetworkType(networkType, 
+            type -> blockchainApplicationService.getLatestBlockHash(type));
     }
 
     /**
@@ -320,110 +253,6 @@ public class BlockchainController {
             return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 네트워크 ID를 조회합니다.
-     * 
-     * @param networkType 네트워크 타입
-     * @return 네트워크 ID
-     */
-    @GetMapping("/network-id")
-    public ResponseEntity<BlockchainResponse<String>> getNetworkId(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String networkId = blockchainApplicationService.getNetworkId(type);
-            String parsedResponse = parseResponseByNetwork(networkId, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 체인 ID를 조회합니다.
-     * 
-     * @param networkType 네트워크 타입
-     * @return 체인 ID
-     */
-    @GetMapping("/chain-id")
-    public ResponseEntity<BlockchainResponse<String>> getChainId(@PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String chainId = blockchainApplicationService.getChainId(type);
-            String parsedResponse = parseResponseByNetwork(chainId, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 트랜잭션 수수료를 계산합니다.
-     * 
-     * @param gasPrice 가스 가격
-     * @param gasLimit 가스 한도
-     * @param networkType 네트워크 타입
-     * @return 트랜잭션 수수료
-     */
-    @GetMapping("/transaction-fee")
-    public ResponseEntity<BlockchainResponse<String>> calculateTransactionFee(@RequestParam String gasPrice,
-                                                                             @RequestParam String gasLimit,
-                                                                             @PathVariable String networkType) {
-        try {
-            NetworkType type = NetworkType.valueOf(networkType.toUpperCase());
-            String fee = blockchainApplicationService.calculateTransactionFee(gasPrice, gasLimit, type);
-            String parsedResponse = parseResponseByNetwork(fee, type);
-            return ResponseEntity.ok(BlockchainResponse.success(parsedResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("Invalid network type"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(BlockchainResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * ERC20 토큰 전송을 수행합니다.
-     * 
-     * @param fromAddress 보내는 지갑 주소
-     * @param toAddress 받는 지갑 주소
-     * @param amount 전송할 토큰 양
-     * @param tokenAddress 토큰 컨트랙트 주소
-     * @param authorization JWT 토큰
-     * @return 전송 결과
-     */
-    @PostMapping("/ethereum/token-transfer")
-    public ResponseEntity<BlockchainResponse<String>> transferERC20Token(
-            @RequestParam String fromAddress,
-            @RequestParam String toAddress,
-            @RequestParam String amount,
-            @RequestParam String tokenAddress,
-            @RequestHeader("Authorization") String authorization) {
-        
-        try {
-            // JWT 토큰에서 Bearer 제거
-            String token = authorization.replace("Bearer ", "");
-            
-            // JWT 토큰에서 사용자 정보 추출
-            String userEmail = jwtService.getEmailFromToken(token);
-            String userRole = jwtService.getRoleFromToken(token);
-            
-            log.info("ERC20 토큰 전송 요청 - From: {}, To: {}, Amount: {}, Token: {}, User: {}", 
-                fromAddress, toAddress, amount, tokenAddress, userEmail);
-            
-            // 토큰 전송 수행 (시뮬레이션)
-            String transactionHash = "0x" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 64);
-            
-            return ResponseEntity.ok(BlockchainResponse.success(transactionHash));
-            
-        } catch (Exception e) {
-            // log.error("ERC20 토큰 전송 실패", e); // Original code had this line commented out
-            return ResponseEntity.badRequest().body(BlockchainResponse.error("토큰 전송 실패: " + e.getMessage()));
         }
     }
 } 

@@ -1,4 +1,4 @@
-package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto;
+package com.bloominggrace.governance.blockchain.infrastructure.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class EthereumRpcError {
+public class BlockchainRpcError {
     
     @JsonProperty("code")
     private int code;

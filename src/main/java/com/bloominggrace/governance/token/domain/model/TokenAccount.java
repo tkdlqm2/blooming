@@ -10,6 +10,7 @@ import com.bloominggrace.governance.token.domain.event.TokensTransferredEvent;
 import com.bloominggrace.governance.token.domain.event.TokensBurnedEvent;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
+import lombok.Getter;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "token_accounts")
+@Getter
 public class TokenAccount extends AggregateRoot {
     
     @Id
@@ -76,53 +78,7 @@ public class TokenAccount extends AggregateRoot {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public UUID getId() {
-        return id;
-    }
 
-    public Wallet getWallet() {
-        return wallet;
-    }
-
-    public UserId getUserId() {
-        return userId;
-    }
-
-    public BigDecimal getTotalBalance() {
-        return totalBalance;
-    }
-
-    public BigDecimal getAvailableBalance() {
-        return availableBalance;
-    }
-
-    public NetworkType getNetwork() {
-        return network;
-    }
-
-    public String getContract() {
-        return contract;
-    }
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public String getWalletAddress() {
-        return walletAddress;
-    }
-
-    public boolean isActive() {
-        return isActive;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
 
     public void mintTokens(BigDecimal amount, String description) {
         if (!isActive) {

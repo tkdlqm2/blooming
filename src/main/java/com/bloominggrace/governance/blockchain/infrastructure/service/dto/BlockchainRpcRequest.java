@@ -1,4 +1,4 @@
-package com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.dto;
+package com.bloominggrace.governance.blockchain.infrastructure.service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -12,7 +12,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EthereumRpcRequest {
+public class BlockchainRpcRequest {
     
     @JsonProperty("jsonrpc")
     @Builder.Default
@@ -28,8 +28,8 @@ public class EthereumRpcRequest {
     @Builder.Default
     private int id = 1;
     
-    public static EthereumRpcRequest of(String method, List<Object> params) {
-        return EthereumRpcRequest.builder()
+    public static BlockchainRpcRequest of(String method, List<Object> params) {
+        return BlockchainRpcRequest.builder()
                 .jsonrpc("2.0")
                 .method(method)
                 .params(params)

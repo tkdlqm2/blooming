@@ -18,7 +18,12 @@ import com.bloominggrace.governance.governance.application.dto.ProposalDetailRes
 import com.bloominggrace.governance.governance.application.dto.CastVoteRequest;
 import com.bloominggrace.governance.governance.application.dto.CastVoteResponse;
 import com.bloominggrace.governance.governance.domain.model.VotingPeriod;
+import com.bloominggrace.governance.governance.application.dto.VotingPeriodDto;
+import com.bloominggrace.governance.governance.application.dto.VoteResultsDto;
+import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
+import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import java.time.LocalDateTime;
+import java.math.BigInteger;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,9 +40,11 @@ import java.math.BigDecimal;
 public class GovernanceController {
     
     private final GovernanceApplicationService governanceService;
+    private final AdminWalletService adminWalletService;
     
-    public GovernanceController(GovernanceApplicationService governanceService) {
+    public GovernanceController(GovernanceApplicationService governanceService, AdminWalletService adminWalletService) {
         this.governanceService = governanceService;
+        this.adminWalletService = adminWalletService;
     }
     
     // ===== 거버넌스 관련 엔드포인트 =====
@@ -349,11 +356,41 @@ public class GovernanceController {
     
     @GetMapping("/proposals/{proposalId}")
     public ResponseEntity<ProposalDto> getProposal(@PathVariable UUID proposalId) {
-        ProposalId proposalIdObj = new ProposalId(proposalId);
-        Proposal proposal = governanceService.getProposal(proposalIdObj)
-            .orElseThrow(() -> new IllegalArgumentException("Proposal not found"));
-        
-        return ResponseEntity.ok(ProposalDto.from(proposal));
+        try {
+            ProposalId proposalIdObj = new ProposalId(proposalId);
+            Proposal proposal = governanceService.getProposal(proposalIdObj)
+                .orElseThrow(() -> new IllegalArgumentException("Proposal not found"));
+            
+            // proposalCount 조회 (기본적으로 Ethereum 네트워크 사용)
+            BigInteger proposalCount = BigInteger.ZERO;
+            try {
+                proposalCount = adminWalletService.getProposalCount(NetworkType.ETHEREUM);
+            } catch (Exception e) {
+                // proposalCount 조회 실패 시 0으로 설정
+                proposalCount = BigInteger.ZERO;
+            }
+            
+            // ProposalDto 생성 시 proposalCount 포함
+            ProposalDto proposalDto = ProposalDto.builder()
+                .id(proposal.getId().getValue())
+                .creatorId(proposal.getCreatorId() != null ? proposal.getCreatorId().getValue() : null)
+                .title(proposal.getTitle())
+                .description(proposal.getDescription())
+                .status(proposal.getStatus().name())
+                .votingPeriod(VotingPeriodDto.from(proposal.getVotingPeriod()))
+                .voteResults(VoteResultsDto.from(proposal.getVoteResults()))
+                .requiredQuorum(proposal.getRequiredQuorum())
+                .createdAt(proposal.getCreatedAt())
+                .updatedAt(proposal.getUpdatedAt())
+                .txHash(proposal.getTxHash())
+                .creatorWalletAddress(proposal.getCreatorWalletAddress())
+                .proposalCount(proposalCount.longValue())
+                .build();
+            
+            return ResponseEntity.ok(proposalDto);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
     
     @GetMapping("/proposals/status/{status}")

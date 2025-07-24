@@ -44,11 +44,5 @@ public class User extends AggregateRoot {
         this.role = role;
     }
 
-    public void addWallet(Wallet wallet) {
-        this.wallets.add(wallet);
-    }
 
-    public UUID getId() {
-        return id;
-    }
 } 

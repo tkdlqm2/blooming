@@ -1,6 +1,7 @@
 package com.bloominggrace.governance.wallet.infrastructure.service.ethereum;
 
 import com.bloominggrace.governance.shared.domain.UserId;
+import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
 import com.bloominggrace.governance.shared.domain.service.EncryptionService;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.wallet.domain.model.Wallet;
@@ -8,9 +9,6 @@ import com.bloominggrace.governance.wallet.domain.service.WalletService;
 import com.bloominggrace.governance.wallet.domain.service.KeyPairProvider;
 import com.bloominggrace.governance.wallet.infrastructure.repository.WalletRepository;
 import com.bloominggrace.governance.shared.domain.model.TransactionBody;
-import com.bloominggrace.governance.shared.domain.model.EthereumTransactionData;
-import com.bloominggrace.governance.shared.util.HashUtils;
-import com.bloominggrace.governance.shared.util.HexUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.bloominggrace.governance.user.domain.model.User;
@@ -19,27 +17,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
-import org.web3j.crypto.Sign;
-import org.web3j.abi.FunctionEncoder;
-import org.web3j.abi.datatypes.Function;
-import org.web3j.abi.datatypes.generated.Uint256;
-import org.web3j.abi.datatypes.Address;
-import org.web3j.abi.datatypes.Utf8String;
-import org.web3j.abi.TypeReference;
-import org.web3j.utils.Numeric;
-
-import java.util.Arrays;
-import java.util.Collections;
 
 import java.util.List;
 import java.util.Optional;
 import java.math.BigInteger;
-import java.math.BigDecimal;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.bloominggrace.governance.shared.infrastructure.service.AdminWalletService;
-import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import org.springframework.context.ApplicationContext;
 
 @Slf4j
@@ -49,7 +33,7 @@ public class EthereumWallet extends WalletService {
     private final WalletRepository walletRepository;
     private final EncryptionService encryptionService;
     private final UserRepository userRepository;
-    
+
     public EthereumWallet(
             ApplicationContext applicationContext,
             WalletRepository walletRepository,
@@ -105,9 +89,7 @@ public class EthereumWallet extends WalletService {
     public Wallet save(Wallet wallet) {
         return walletRepository.save(wallet);
     }
-    
 
-    
     @Override
     public Wallet updateActiveStatus(String walletAddress, boolean active) {
         return walletRepository.findAll().stream()
@@ -257,14 +239,5 @@ public class EthereumWallet extends WalletService {
 
     private long getChainId() {
         // 환경변수나 설정파일에서 읽어오도록 개선 가능
-        return BlockchainMetadata.Ethereum.CHAIN_ID; // 기본값 사용
-    }
-    /**
-     * 가스 가격 가져오기 (0.0000001 ETH로 조정 - 5배 증가)
-     */
-    private BigInteger getGasPrice() {
-        // BlockchainMetadata에서 가스 가격 가져오기
-        return BlockchainMetadata.Ethereum.GAS_PRICE;
-    }
-
-} 
+        return EthereumConstants.Network.CHAIN_ID; // 기본값 사용
+    }}

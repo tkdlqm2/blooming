@@ -42,15 +42,14 @@ public class AdminWalletService {
             BigInteger cached = proposalCountCache.get(networkType);
             if (cached != null) {
                 log.debug("📋 ProposalCount from cache: {}", cached);
+                cached.add(BigInteger.ONE);
                 return cached;
             }
 
             // 캐시에 없으면 블록체인에서 조회
             log.info("🔄 Loading ProposalCount from blockchain for {}", networkType);
-            BigInteger count = blockchainClientFactory.getClient(networkType).getProposalCount();
-            if (count.equals(BigInteger.ZERO)) {
-                count = BigInteger.ONE;
-            }
+            BigInteger count = blockchainClientFactory.getClient(networkType).getProposalCount().add(BigInteger.ONE);
+
             // 캐시에 저장
             proposalCountCache.put(networkType, count);
             log.info("✅ ProposalCount cached: {}", count);

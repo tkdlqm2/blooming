@@ -21,6 +21,7 @@ public class ProposalDto {
     private final LocalDateTime updatedAt;
     private final String txHash;
     private final String creatorWalletAddress;
+    private final long proposalCount;
 
     public ProposalDto(
             UUID id,
@@ -33,6 +34,7 @@ public class ProposalDto {
             long requiredQuorum,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
+            long proposalCount,
             String txHash,
             String creatorWalletAddress) {
         this.id = id;
@@ -47,6 +49,7 @@ public class ProposalDto {
         this.updatedAt = updatedAt;
         this.txHash = txHash;
         this.creatorWalletAddress = creatorWalletAddress;
+        this.proposalCount = proposalCount;
     }
 
     public static ProposalDto from(Proposal proposal) {
@@ -63,6 +66,7 @@ public class ProposalDto {
             .updatedAt(proposal.getUpdatedAt())
             .txHash(proposal.getTxHash())
             .creatorWalletAddress(proposal.getCreatorWalletAddress())
+            .proposalCount(proposal.getProposalCount() != null ? proposal.getProposalCount().longValue() : 0L)
             .build();
     }
     
@@ -100,6 +104,7 @@ public class ProposalDto {
         private LocalDateTime updatedAt;
         private String txHash;
         private String creatorWalletAddress;
+        private long proposalCount;
         
         public ProposalDtoBuilder id(UUID id) {
             this.id = id;
@@ -161,8 +166,13 @@ public class ProposalDto {
             return this;
         }
         
+        public ProposalDtoBuilder proposalCount(long proposalCount) {
+            this.proposalCount = proposalCount;
+            return this;
+        }
+        
         public ProposalDto build() {
-            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, txHash, creatorWalletAddress);
+            return new ProposalDto(id, creatorId, title, description, status, votingPeriod, voteResults, requiredQuorum, createdAt, updatedAt, proposalCount, txHash, creatorWalletAddress);
         }
     }
 
@@ -212,5 +222,9 @@ public class ProposalDto {
     
     public String getCreatorWalletAddress() {
         return creatorWalletAddress;
+    }
+    
+    public long getProposalCount() {
+        return proposalCount;
     }
 } 

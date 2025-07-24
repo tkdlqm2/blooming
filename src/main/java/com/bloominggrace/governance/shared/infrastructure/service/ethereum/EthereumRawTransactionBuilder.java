@@ -1,11 +1,9 @@
 package com.bloominggrace.governance.shared.infrastructure.service.ethereum;
 
-import com.bloominggrace.governance.blockchain.infrastructure.service.ethereum.EthereumBlockchainClient;
 import com.bloominggrace.governance.shared.domain.service.RawTransactionBuilder;
 import com.bloominggrace.governance.blockchain.application.service.BlockchainClientFactory;
 import com.bloominggrace.governance.blockchain.domain.service.BlockchainClient;
 import com.bloominggrace.governance.wallet.domain.model.NetworkType;
-import com.bloominggrace.governance.shared.domain.model.BlockchainMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.Builder;
@@ -14,13 +12,13 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Arrays;
 import java.util.Collections;
+import com.bloominggrace.governance.shared.domain.constants.EthereumConstants;
 
 // Web3j imports
 import org.web3j.abi.FunctionEncoder;
@@ -29,7 +27,6 @@ import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.Address;
-import org.web3j.abi.TypeReference;
 
 /**
  * 이더리움 네트워크용 RawTransaction 생성기
@@ -152,14 +149,14 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
             log.info("Voting duration in blocks: {}", endBlock.subtract(startBlock));
 
             // 5. 거버넌스 컨트랙트 주소 가져오기
-            String governanceContractAddress = BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS;
+            String governanceContractAddress = EthereumConstants.Contracts.GOVERNANCE_CONTRACT_ADDRESS;
 
             // 6. 실제 거버넌스 컨트랙트의 propose() 함수 데이터 생성 (블록 번호 포함)
             String functionData = createProposeFunctionData(title, description, startBlock.add(BigInteger.valueOf(6)), endBlock);
 
-            // 7. RawTransaction 생성
-            BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
-            BigInteger gasLimit = BlockchainMetadata.Ethereum.PROPOSAL_CREATION_GAS_LIMIT;
+                    // 7. RawTransaction 생성
+            BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
+            BigInteger gasLimit = EthereumConstants.Gas.PROPOSAL_CREATION_GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // propose() 함수는 value가 0
 
             // 8. RawTransaction을 JSON 형태로 반환 (기존 인터페이스 유지)
@@ -199,15 +196,15 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
                 log.info("[EthereumRawTransactionBuilder] Got nonce for {}: {}", walletAddress, nonce);
             }
 
-            // 2. 거버넌스 컨트랙트 주소 가져오기
-            String governanceContractAddress = BlockchainMetadata.Ethereum.GOVERNANCE_CONTRACT_ADDRESS;
+                    // 2. 거버넌스 컨트랙트 주소 가져오기
+        String governanceContractAddress = EthereumConstants.Contracts.GOVERNANCE_CONTRACT_ADDRESS;
 
             // 3. 투표 함수 데이터 생성 (vote 함수 호출)
             String functionData = createVoteFunctionData(proposalCount, voteType);
 
-            // 4. RawTransaction 생성
-            BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
-            BigInteger gasLimit = BlockchainMetadata.Ethereum.VOTE_GAS_LIMIT;
+                    // 4. RawTransaction 생성
+        BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
+        BigInteger gasLimit = EthereumConstants.Gas.VOTE_GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // 투표는 value가 0
 
             // 5. JSON 형태로 반환
@@ -248,15 +245,15 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
             String nonce = blockchainClient.getNonce(delegatorWalletAddress);
             log.info("[EthereumRawTransactionBuilder] Got nonce for {}: {}", delegatorWalletAddress, nonce);
 
-            // 2. 거버넌스 토큰 컨트랙트 주소 가져오기
-            String tokenContractAddress = BlockchainMetadata.Ethereum.ERC20_CONTRACT_ADDRESS;
+                    // 2. 거버넌스 토큰 컨트랙트 주소 가져오기
+        String tokenContractAddress = EthereumConstants.Contracts.ERC20_CONTRACT_ADDRESS;
 
             // 3. 위임 함수 데이터 생성
             String functionData = createDelegateFunctionData(delegateeWalletAddress);
 
-            // 4. RawTransaction 생성
-            BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
-            BigInteger gasLimit = BlockchainMetadata.Ethereum.GAS_LIMIT;
+                    // 4. RawTransaction 생성
+        BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
+        BigInteger gasLimit = EthereumConstants.Gas.GAS_LIMIT;
             BigInteger value = BigInteger.ZERO; // 위임은 value가 0
 
             // 5. RawTransaction을 JSON 형태로 반환
@@ -452,7 +449,7 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
      * 가스 추정 및 설정
      */
     private GasConfig estimateAndConfigureGas(TransactionParams params, TransactionData txData, TransactionType txType) {
-        BigInteger gasPrice = BlockchainMetadata.Ethereum.GAS_PRICE;
+        BigInteger gasPrice = EthereumConstants.Gas.GAS_PRICE;
         BigInteger gasLimit = resolveGasLimit(params, txData, txType);
 
         return GasConfig.builder()
@@ -470,7 +467,7 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
         }
 
         // 기본 가스 가격 사용 또는 네트워크에서 조회
-        return BlockchainMetadata.Ethereum.GAS_PRICE;
+        return EthereumConstants.Gas.GAS_PRICE;
     }
 
     /**
@@ -478,9 +475,9 @@ public class EthereumRawTransactionBuilder implements RawTransactionBuilder {
      */
     private BigInteger resolveGasLimit(TransactionParams params, TransactionData txData, TransactionType txType) {
         if(txType == TransactionType.ERC20_TRANSFER) {
-            return BlockchainMetadata.Ethereum.TRANSFER_DELEGATE_GAS_LIMIT;
+            return EthereumConstants.Gas.TRANSFER_DELEGATE_GAS_LIMIT;
         } else {
-            return BlockchainMetadata.Ethereum.GAS_LIMIT;
+            return EthereumConstants.Gas.GAS_LIMIT;
         }
     }
 

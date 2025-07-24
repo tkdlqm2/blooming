@@ -53,7 +53,7 @@ if [ "$PROPOSAL_STATUS" = "DRAFT" ]; then
     log_info "2️⃣ 제안 활성화 중..."
     ACTIVATE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/${PROPOSAL_ID}/activate")
     log_info "활성화 응답: $ACTIVATE_RESPONSE"
-    
+
     if echo "$ACTIVATE_RESPONSE" | grep -q '"success":true'; then
         log_success "제안이 활성화되었습니다!"
         PROPOSAL_STATUS="ACTIVE"
@@ -68,7 +68,7 @@ if [ "$PROPOSAL_STATUS" = "ACTIVE" ]; then
     log_info "3️⃣ 투표 기간 수정 중..."
     UPDATE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/${PROPOSAL_ID}/update-voting-period")
     log_info "투표 기간 수정 응답: $UPDATE_RESPONSE"
-    
+
     if echo "$UPDATE_RESPONSE" | grep -q '"success":true'; then
         log_success "투표 기간이 수정되었습니다!"
     else
@@ -82,7 +82,7 @@ if [ "$PROPOSAL_STATUS" = "ACTIVE" ]; then
     log_info "4️⃣ 투표 시작 중..."
     START_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/${PROPOSAL_ID}/start-voting")
     log_info "투표 시작 응답: $START_RESPONSE"
-    
+
     if echo "$START_RESPONSE" | grep -q '"success":true'; then
         log_success "투표가 시작되었습니다!"
         PROPOSAL_STATUS="VOTING"
@@ -95,7 +95,7 @@ fi
 # 5단계: 투표 실행
 if [ "$PROPOSAL_STATUS" = "VOTING" ]; then
     log_info "5️⃣ 투표 실행 중..."
-    
+
     # VoteType.YES 사용 (올바른 enum 값)
     VOTE_PAYLOAD=$(cat <<EOF
 {
@@ -107,15 +107,15 @@ if [ "$PROPOSAL_STATUS" = "VOTING" ]; then
 }
 EOF
 )
-    
+
     log_info "투표 페이로드: $VOTE_PAYLOAD"
-    
+
     VOTE_RESPONSE=$(curl -s -X POST "${BASE_URL}/api/governance/proposals/${PROPOSAL_ID}/vote-blockchain" \
         -H "Content-Type: application/json" \
         -d "$VOTE_PAYLOAD")
-    
+
     log_info "투표 응답: $VOTE_RESPONSE"
-    
+
     if echo "$VOTE_RESPONSE" | grep -q '"success":true'; then
         log_success "투표가 성공적으로 완료되었습니다!"
     else
@@ -127,4 +127,4 @@ else
     exit 1
 fi
 
-log_success "✅ 모든 과정이 완료되었습니다!" 
+log_success "✅ 모든 과정이 완료되었습니다!"

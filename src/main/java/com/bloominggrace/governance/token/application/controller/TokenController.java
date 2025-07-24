@@ -57,31 +57,4 @@ public class TokenController {
         List<Transaction> transactions = tokenApplicationService.getTransactionHistory(new UserId(UUID.fromString(userId)));
         return ResponseEntity.ok(transactions);
     }
-    
-    /**
-     * 토큰 민팅 (테스트용)
-     */
-    @PostMapping("/mint")
-    public ResponseEntity<String> mintTokens(@RequestBody MintTokenRequest request) {
-        try {
-            String txHash = tokenApplicationService.mintTokens(
-                new UserId(UUID.fromString(request.userId())),
-                request.walletAddress(),
-                request.amount(),
-                request.description(),
-                request.networkType()
-            );
-            return ResponseEntity.ok("Tokens minted successfully. Transaction hash: " + txHash);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to mint tokens: " + e.getMessage());
-        }
-    }
-    
-    public record MintTokenRequest(
-        String userId,
-        String walletAddress,
-        BigDecimal amount,
-        String description,
-        String networkType
-    ) {}
 } 

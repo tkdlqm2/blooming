@@ -7,8 +7,6 @@ import com.bloominggrace.governance.wallet.domain.model.NetworkType;
 import com.bloominggrace.governance.shared.util.HexUtils;
 import com.bloominggrace.governance.shared.domain.model.TransactionBody;
 import com.bloominggrace.governance.shared.domain.model.EthereumTransactionData;
-import com.bloominggrace.governance.shared.domain.model.EthereumTransactionBodyFactory;
-import com.bloominggrace.governance.shared.infrastructure.service.ethereum.EthereumRawTransactionBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

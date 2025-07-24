@@ -437,7 +437,8 @@ public class GovernanceApplicationService {
             System.out.println("투표자: " + voterWalletAddress);
             System.out.println("투표 타입: " + voteType.name());
             System.out.println("투표권: " + votingPower);
-            
+            System.out.println("투표 proposalCount: " + proposal.getProposalCount());
+
             TransactionResult txResult = transactionOrchestrator.executeVoteCreation(
                 proposal.getProposalCount(),
                 proposalId.getValue(),
